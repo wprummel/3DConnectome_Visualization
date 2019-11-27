@@ -4,13 +4,20 @@ jep = JEP.json_extract_properties()
 
 jep.set_csv_file('/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv')
 
-jep.dict_read_csv()
+jep.read_csv()
 
-jep.get_subject_content()
+print(jep.get_subject_content(1))
+
+# jep.store_index_list()
+
+jep.set_output_directory('/work/wprummel/data/maria5/EBDS_CIVILITY')
 
 jep.dict_write_json()
 
-jep.get_nodeName_index()
+# jep.get_nodeName_index()
+
+jep.get_values()
+
 
 #jep.name_to_index()
 

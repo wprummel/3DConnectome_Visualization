@@ -7,14 +7,10 @@ This script extracts properties from the initial json file
 in order to associate an index (Matrix Rox) form the json, 
 with the corresponding node degree form another file
 """
-
-
 #self.path_to_json ='/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json'
 # self.user_file = '/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv'
 
 # #self.nodeGraphArray = []
-
-
 
 # self.user_csvFile = open(self.user_file, "r")
 # read_csvFile(self.user_csvFile)
@@ -26,112 +22,74 @@ class json_extract_properties():
   def __init__(self):
     self.csv_file = ''
     self.subject_num = 10
+    self.output_directory = "out"
+    self.csv_content = []
+    self.min = 2
+    self.max = 80
 
   def set_csv_file(self, csv_file):
     self.csv_file = csv_file
 
-  # Read csv as a dictionary
-  def dict_read_csv(self):
-
-    with open(self.csv_file, "r") as csv_file:
-        self.csv_content = csv.DictReader(csv_file, delimiter=',')
-        #self.csv_content = csv.reader(csv_file, delimiter=',')
-
-        order_dict = []
-
-        for i, row in enumerate(self.csv_content):
-
-          print(i, json.dumps(row, sort_keys=True, indent=4))
-          order_dict.append({'subjects' : i, 'names' :{'name': row}})
-          #print (order_dict)
-
-          #order_dict = (i, json.dumps(row, sort_keys=True, indent=4))
-          #print (order_dict)
-        return order_dict
-        #return
-
+  def set_output_directory(self, outdir):
+    self.output_directory = outdir    
 
   # Read csv as string and ask user for an interval : begin and end 
   def read_csv(self):
 
     self.csv_content = []
     with open(self.csv_file, "r") as csv_file:
-        # self.csv_content = csv.DictReader(csv_file, delimiter=',')
-        self.csv_content = csv.reader(csv_file, delimiter=',')
+        # csv_reader = csv.DictReader(csv_file, delimiter=',')
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        for row in csv_reader:
+          self.csv_content.append(row)
 
+  def get_subject_content(self, index):
+    
+    if(index < len(self.csv_content)):      
+      return self.csv_content[index]
 
-    return self.csv_content
-        
+# Store the corresponding indexes in a list
+  def store_index_list(self):
 
-  def get_subject_content(self):
+    with open('translation_table.json', 'r') as tr:
 
-    with open('csv_to_json.json', 'w') as f:
+      table = json.load(tr)
+      index = []
 
-        data = self.dict_read_csv()
-        json.dump(data, f, sort_keys=True, indent=4)
+      for value in table.values():
 
+        index.append(value)
+
+      #print (index)
+      return index
+
+  # Write each subject data to a different json file 
   def dict_write_json(self):
     for i, row in enumerate(self.csv_content):
       #print(i, json.dumps(row, sort_keys=True, indent=4))
-      # subject.append({'subjects' : i, 'names' :{'name': row}})  
-      out_name = os.path.join(out_directory, "subject_.json" %i)
+      # subject.append({'subjects' : i, 'names' :{'name': row}})        
+      out_name = os.path.join(self.output_directory , "subject_" + str(i) + ".json")
+
       with open(out_name, 'w') as f:
         json.dump(row, f, sort_keys=True, indent=4)
 
-  def get_subject(self, row):
+  # Return the corresponding values (eigen or node degree for example)
+  def get_values(self):
 
-    return self.csv_content[row]
+    i = self.subject_num
 
-  def get_nodeName_index(self):
+    with open('/work/wprummel/data/maria5/EBDS_CIVILITY/subject_' + str(i) + '.json', 'r') as sub:
 
-    index = []
-
-    with open('subject_num.json', 'r') as jfile:
-
-      subject_nb = json.load(jfile)
-
-      for i in subject_nb.items():
-
-        index.append(i)
-      print (index)
-      return index
-
-    #     line_count = 2
-    #     i=2
-    #     subject = []
-    #     j=1
-
-    #     for j in self.eigenVectCenter:
-
-    #         #subject.append({", ".join(j)})
-    #         subject.append(j)
-
-    #         #subject.append(self.eigenVectCenter[2][j])
-    #     #for row in self.eigenVectCenter:
-
-    #     # if line_count == 2:
-
-    #     #     print({", ".join(row)})
-    #             #line_count += 1
-            
-    #         # else:
-
-    #         #     print( {row[2]})
-    #         #     line_count += 1
-    # subjectCurrent = subject[1]
-
-    # del subjectCurrent[0]
-    # del subjectCurrent[0]
-    # print subjectCurrent[1]
-    # print ('Current subject is :', len(subjectCurrent))
-    # print len(subjectCurrent)
-    # #print (len(subject[1]))
-    # return subjectCurrent
+      value = json.load(sub)
+      print (len(value))
+      # ask the user for a begin and a end value
+      value = value[self.min:self.max]
+      print (value)
   
   def write_json(self):
 
     #node_properties = []
-    node_properties = {}
+    node_properties = {} 
     #node_properties['MatrixRow'] = [self.get_node_index(self.nodeGraphArray)]
     #matrixIndex = self.get_node_index(self.nodeGraphArray)
     #matrixIndex.remove(-1)
@@ -171,7 +129,6 @@ class json_extract_properties():
         nodeIndex.append(key) 
 
     return nodeIndex
-
 
   def sort_by_matrixRow(self, nodeGraphArray):
     
