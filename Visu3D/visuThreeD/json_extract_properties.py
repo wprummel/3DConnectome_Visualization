@@ -21,11 +21,8 @@ class json_extract_properties():
 
   def __init__(self):
     self.csv_file = ''
-    self.subject_num = 10
     self.output_directory = "out"
     self.csv_content = []
-    self.min = 2
-    self.max = 80
 
   def set_csv_file(self, csv_file):
     self.csv_file = csv_file
@@ -34,7 +31,7 @@ class json_extract_properties():
     self.output_directory = outdir    
 
   # Read csv as string and ask user for an interval : begin and end 
-  def read_csv(self):
+  def read_csv(self): 
 
     self.csv_content = []
     with open(self.csv_file, "r") as csv_file:
@@ -43,12 +40,37 @@ class json_extract_properties():
         for row in csv_reader:
           self.csv_content.append(row)
 
-  def get_subject_content(self, index):
-    
-    if(index < len(self.csv_content)):      
-      return self.csv_content[index]
+  # Extracts the values from the table loaded trough the Data Module
+  # Data is stored in a matrix/table, 
+  # table_content is of same type as csv_content in read_csv()
+  def set_table(self, table):
+    table_content = []
+    header_content = []
+    self.max_column = table.GetNumberOfColumns()
 
-# Store the corresponding indexes in a list
+    for i in range(table.GetNumberOfColumns()):
+      header_content.append(table.GetColumnName(i))
+
+    table_content.append(header_content)
+
+    for i in range(table.GetNumberOfRows()):
+      row_content = []
+      for j in range(table.GetNumberOfColumns()):
+        row_content.append(table.GetCellText(i, j))
+      table_content.append(row_content)
+
+    print ('list of property values', table_content)
+    self.csv_content = table_content
+
+  def get_subject_content(self, index):
+    l = len(self.csv_content) 
+    print ('len csv.content', l)
+    if(index < len(self.csv_content)): 
+      print('content isssss', self.csv_content[index]) 
+      return self.csv_content[index]
+    return []
+
+  # Store the corresponding indexes in a list
   def store_index_list(self):
 
     with open('translation_table.json', 'r') as tr:
@@ -73,71 +95,11 @@ class json_extract_properties():
       with open(out_name, 'w') as f:
         json.dump(row, f, sort_keys=True, indent=4)
 
-  # Return the corresponding values (eigen or node degree for example)
-  def get_values(self):
-
-    i = self.subject_num
-
-    with open('/work/wprummel/data/maria5/EBDS_CIVILITY/subject_' + str(i) + '.json', 'r') as sub:
-
-      value = json.load(sub)
-      print (len(value))
-      # ask the user for a begin and a end value
-      value = value[self.min:self.max]
-      print (value)
-  
-  def write_json(self):
-
-    #node_properties = []
-    node_properties = {} 
-    #node_properties['MatrixRow'] = [self.get_node_index(self.nodeGraphArray)]
-    #matrixIndex = self.get_node_index(self.nodeGraphArray)
-    #matrixIndex.remove(-1)
-
-    eigenVect = self.read_csvFile(self.user_csvFile)
-
-    for index,eigen in enumerate(eigenVect, start =1):
-
-        #node_properties.append({'MatrixRow' : index , 'properties' : {'scalars' : {'eigenVectCenter' : eigen}}})
-        node_properties = {'MatrixRow' : index , 'properties' : {'scalars' : {'eigenVectCenter' : eigen}}}
-        node_properties.update(node_properties)
-
-    print (node_properties) 
-    #return node_properties
-
-    # convert node_properties [list] to dictionary 
-    #it = iter(node_properties)
-    #dict_prop = dict(zip(it,it)) 
-
-    # convert into json
-    json_prop = json.dumps(node_properties, sort_keys=True, indent=4)
-    print (json_prop)
-
-
-    # Call filter function
-    # d5=self.filterVisuHierarchyMap(self.nodeGraphArray)
-    # print(json.dumps(d5, sort_keys=True, indent=4))
-
-  def get_node_index(self, nodeGraphArray):
-    
-    nodeIndex = []
-    d_row = self.createMatrixRowMap(self.nodeGraphArray)   
-    #key = "MatrixRow"  
-
-    for key in d_row.keys():
-
-        nodeIndex.append(key) 
-
-    return nodeIndex
-
-  def sort_by_matrixRow(self, nodeGraphArray):
-    
-    row = {}
-
-    for i,node in enumerate(self.nodeGraphArray):
-
-    	row[node["MatrixRow"]] = node        
-
-    return row
-
-
+  def get_subject_values(self, subject_index, min_column, max_column):
+    subject_content = self.get_subject_content(subject_index)
+    print("subject_content", subject_content)
+    print("subject_content", len(subject_content))
+    if(len(subject_content) > min_column):
+      #return subject_content[min_column:max_column]
+      return [float(v) for v in subject_content[min_column:max_column]]
+    return []

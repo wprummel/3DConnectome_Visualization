@@ -7,11 +7,8 @@ import json, ast
 import re
 import vtkSegmentationCorePython
 import numpy as np
-from json_extract_properties import *
-#import json_extract_properties
+import json_extract_properties as JEP
 import csv
-#import pdb
-#pdb.set_trace()
 
 #
 # visuThreeD
@@ -59,7 +56,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     #
     # self.searchBox = ctk.ctkSearchBox()
     # fileFormLayout.addRow("Search:", self.searchBox)
-    # self.searchBox.connect("textChanged(QString)", self.onSearch)
+    # self.searchBox.connect("textChanged(QString)", self.on_search)
 
     # # file selector
     # self.fileSelector = qt.QComboBox()
@@ -72,7 +69,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
 
     # # connections
     # self.fileSelector.connect('currentIndexChanged(int)', self.onFileSelect)
-    #self.regioncheckbox()
+    #self.region_checkbox()
     #
     # Parameters Area
     #
@@ -87,7 +84,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     # input volume selector
     #
     self.inputSelector = slicer.qMRMLNodeComboBox()
-    self.inputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    self.inputSelector.nodeTypes = ["vtkMRMLTableNode"]
     self.inputSelector.selectNodeUponCreation = True
     self.inputSelector.addEnabled = False
     self.inputSelector.removeEnabled = False
@@ -95,23 +92,23 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     self.inputSelector.showHidden = False
     self.inputSelector.showChildNodeTypes = False
     self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+    self.inputSelector.setToolTip( "Pick the csv file input to the algorithm." )
+    parametersFormLayout.addRow("Input Table: ", self.inputSelector)
 
     #
     # output volume selector
     #
-    self.outputSelector = slicer.qMRMLNodeComboBox()
-    self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    self.outputSelector.selectNodeUponCreation = True
-    self.outputSelector.addEnabled = True
-    self.outputSelector.removeEnabled = True
-    self.outputSelector.noneEnabled = True
-    self.outputSelector.showHidden = False
-    self.outputSelector.showChildNodeTypes = False
-    self.outputSelector.setMRMLScene( slicer.mrmlScene )
-    self.outputSelector.setToolTip( "Pick the output to the algorithm." )
-    parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
+    # self.outputSelector = slicer.qMRMLNodeComboBox()
+    # self.outputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
+    # self.outputSelector.selectNodeUponCreation = True
+    # self.outputSelector.addEnabled = True
+    # self.outputSelector.removeEnabled = True
+    # self.outputSelector.noneEnabled = True
+    # self.outputSelector.showHidden = False
+    # self.outputSelector.showChildNodeTypes = False
+    # self.outputSelector.setMRMLScene( slicer.mrmlScene )
+    # self.outputSelector.setToolTip( "Pick the output to the algorithm." )
+    # parametersFormLayout.addRow("Output Volume: ", self.outputSelector)
     
     #
     # input file selector
@@ -134,18 +131,26 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     #self.inputJson.browse()
     #self.inputJson.directory(".json")
 
-    # threshold value
     #
-    self.imageThresholdSliderWidget = ctk.ctkSliderWidget()
-    self.imageThresholdSliderWidget.singleStep = 0.1
-    self.imageThresholdSliderWidget.minimum = -100
-    self.imageThresholdSliderWidget.maximum = 100
-    self.imageThresholdSliderWidget.value = 0.5
-    self.imageThresholdSliderWidget.setToolTip("Set threshold value for computing the output image. Voxels that have intensities lower than this value will set to zero.")
-    parametersFormLayout.addRow("Image threshold", self.imageThresholdSliderWidget)
+    # Checkbox to weather or not the input table has a header
+    #
+    self.headerCheckBox = qt.QCheckBox()
+    self.headerCheckBox.checked = 0
+    self.headerCheckBox.setToolTip("If checked, it means that the input table contains a header.")
+    parametersFormLayout.addRow("Header", self.headerCheckBox)
 
     #
-    # check box to trigger taking screen shots for later use in tutorials
+    # Table start column spinBox
+    #
+    self.min_column = 1.00
+    self.tableStartSpinBox = qt.QDoubleSpinBox()
+    self.tableStartSpinBox.singleStep = 1
+    self.tableStartSpinBox.setValue(self.min_column)
+    self.tableStartSpinBox.setToolTip("Set start column, this should be a value (float/int)")
+    parametersFormLayout.addRow("Start Column:", self.tableStartSpinBox)
+
+    #
+    # Check box to trigger taking screen shots for later use in tutorials
     #
     self.enableScreenshotsFlagCheckBox = qt.QCheckBox()
     self.enableScreenshotsFlagCheckBox.checked = 0
@@ -233,14 +238,6 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     self.regionsButtonGroup = qt.QButtonGroup(self.regionsLayout)
     self.regionsButtonGroup.exclusive = False
 
-    # logic = visuThreeDLogic()
-    # self.path_to_json ='/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json'
-    # self.nodeGraphArray = []
-    # with open(self.path_to_json, "r") as dct:
-    #     self.nodeGraphArray = json.load(dct)
-    # self.regions = logic.readName_JsonFile(self.nodeGraphArray)
-
-
     self.regions = ['seed.left.frontal.', 'seed.right.cingulate.', 'seed.right.occipital.']
     #create a checkbox for each region
     #Store de region buttons in a dictionnary
@@ -264,15 +261,27 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     #return regionButtons
 
     #
-    # Threshold node size
+    # Import json and csv file Area
     #
-    self.nodeThresholdSliderWidget = ctk.ctkSliderWidget()
-    self.nodeThresholdSliderWidget.singleStep = 0.1
-    self.nodeThresholdSliderWidget.minimum = 0
-    self.nodeThresholdSliderWidget.maximum = 10
-    self.nodeThresholdSliderWidget.value = 0.5
-    self.nodeThresholdSliderWidget.setToolTip("Set threshold size value for computing the node size.")
-    self.nodeselectFormLayout.addRow("Size:", self.nodeThresholdSliderWidget)
+    self.fileCollapsibleButton = ctk.ctkCollapsibleButton()
+    self.fileCollapsibleButton.text = "Import json or csv file"
+    self.layout.addWidget(self.fileCollapsibleButton)
+    self.fileImportFormLayout = qt.QFormLayout(self.fileCollapsibleButton)
+
+    self.fileImport = ctk.ctkPathLineEdit()
+    self.fileImport.filters = ctk.ctkPathLineEdit.Files
+    self.fileImport.settingKey = 'JsonInputFile'
+    self.fileImportFormLayout.addRow("Input Json File:", self.fileImport)
+    self.path = self.fileImport.currentPath
+
+    self.fileExport = ctk.ctkPathLineEdit()
+    self.fileExport.filters = ctk.ctkPathLineEdit.Dirs
+    self.fileExport.settingKey = 'JsonOutputDirs'
+    self.fileImportFormLayout.addRow("Output directory:", self.fileExport)
+
+    self.fileImportButton = qt.QPushButton('Load files')
+    self.fileImportButton.checked = False
+    self.fileImportFormLayout.addRow(self.fileImportButton)
 
     #
     # Node Size and colorbar thresholding Area
@@ -292,28 +301,51 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     self.ColorTable.setMRMLScene( slicer.mrmlScene )
     self.regioncheckFormLayout.addRow("Input color map: ", self.ColorTable)
 
+    #
+    # Threshold node value
+    #
+    # default values
+    self.logic = visuThreeDLogic()
+    self.minVal = 0.0
+    self.maxVal = 0.6
+    self.nodeThresholdSliderWidget = ctk.ctkRangeWidget()
+    self.nodeThresholdSliderWidget.singleStep = 0.01
+    self.nodeThresholdSliderWidget.setValues(self.minVal, self.maxVal)
+    self.nodeThresholdSliderWidget.setMaximumValue(self.maxVal)
+    self.nodeThresholdSliderWidget.setMinimumValue(self.minVal)
+    self.nodeThresholdSliderWidget.setRange(self.minVal, self.maxVal)
+    self.nodeThresholdSliderWidget.setMouseTracking(True)
+    self.nodeThresholdSliderWidget.setEnabled(True)
+    self.nodeThresholdSliderWidget.setToolTip("Set threshold node value for computing the node value.")
+    self.regioncheckFormLayout.addRow("Plot property range:", self.nodeThresholdSliderWidget)
 
+    #
+    # Node size min spinBox
+    #
+    # default value for min size (l: lowest , h: highest)
+    self.minSize_l = 0.0
+    self.minSize_h = 7.0
+    self.nodeMinSizeSpinBox = qt.QDoubleSpinBox()
+    self.nodeMinSizeSpinBox.singleStep = 0.01
+    self.nodeMinSizeSpinBox.setRange(self.minSize_l, self.minSize_h)
+    self.nodeMinSizeSpinBox.setToolTip("Set minimum node size.")
+    self.regioncheckFormLayout.addRow("Min size:", self.nodeMinSizeSpinBox)
 
-    # self.lookupTable = vtk.vtkLookupTable()
-    # self.lookupTable.SetNumberOfTableValues(20)
-    # self.lookupTable.Build()
-    # self.ColorTable.currentColorNodeID()
-    # for i in range(0, 20):
-    #     colorbar =self.ColorTable.nodeFromIndex()
-    #     self.lookupTable.SetTableValue(i, colorbar)
+    #
+    # Node size max spinBox
+    #
+    # default value for max size (l: lowest , h: highest)
+    self.maxSize_l = 7.0
+    self.maxSize_h = 12.0
+    self.nodeMaxSizeSpinBox = qt.QDoubleSpinBox()
+    self.nodeMaxSizeSpinBox.singleStep = 0.01
+    self.nodeMaxSizeSpinBox.setRange(self.maxSize_l, self.maxSize_h)
+    self.nodeMaxSizeSpinBox.setToolTip("Set maximum node size.")
+    self.regioncheckFormLayout.addRow("Max size:", self.nodeMaxSizeSpinBox)   
 
-
-    # self.inputSelector.nodeTypes = ["vtkMRMLScalarVolumeNode"]
-    # self.inputSelector.selectNodeUponCreation = True
-    # self.inputSelector.addEnabled = False
-    # self.inputSelector.removeEnabled = False
-    # self.inputSelector.noneEnabled = False
-    # self.inputSelector.showHidden = False
-    # self.inputSelector.showChildNodeTypes = False
-    # self.inputSelector.setMRMLScene( slicer.mrmlScene )
-    # self.inputSelector.setToolTip( "Pick the input to the algorithm." )
-    # parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
-
+    #
+    # Node Connections Area
+    #
 
     #
     # connections
@@ -325,178 +357,118 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     self.index = []
     self.position = []
     self.visu = []
-    self.logic = visuThreeDLogic()
     #self.nodeButton.connect('mouseclick(bool)', self.onMouseClick)
     #self.applyButton.connect('clicked(bool)', self.logic.store_CoordInList(self.x,self.y,self.z))
-    self.applyButton.connect('clicked(bool)', self.onApplyButton)  
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
-    #self.regionsButtonGroup.connect('clicked()', self.regioncheckbox())
-    self.regionsButtonGroup.buttonClicked.connect(self.onRegionSelect)
-    #self.calculateAllregionsButton.connect(self.onSelectAllRegionsButton)
+    #self.applyButton.connect('clicked(bool)', self.on_apply_button)  
+    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.on_select)
+    #self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.on_select)
+    #self.regionsButtonGroup.connect('clicked()', self.region_checkbox())
+    self.regionsButtonGroup.buttonClicked.connect(self.on_region_select)
+    #self.calculateAllregionsButton.connect(self.on_select_all_regionsButton)
     self.regionsButtonGroup.buttonReleased.connect(self.cleanup)
     #singal is TextChanged
-    self.regionSearchBox.connect("textChanged(QString)", self.onSearch)
+    self.regionSearchBox.connect("textChanged(QString)", self.on_search)
+    #self.fileImportButton.connect('clicked(bool)', self.on_browse)
+    self.fileImportButton.connect('clicked(bool)', self.on_file_load)
     #self.ColorTable.connect("currentNodeChanged(vtkMRMLColorTableNode*)", "setColorNode(vtkMRMLColorTableNode*)")
     #self.ColorTable.connect("setColorNode(vtkMRMLColorTableNode*)", self.ColorTable.currentNode())
-    
-    #currentColorNodeID = self.mrmlManager().GetColorNodeID()
-    #currentColorNode = slicer.mrmlScene.GetNodeByID( currentColorNodeID )
-    #if currentColorNode:
-    #  self.__colorTableComboBox.setCurrentNode( currentColorNode )
 
-    # self.displayNode =vtk.vtkMRMLScalarVolumeNode()
-    # if self.displayNode:
-    #     self.ColorTable.setCurrentNode(self.displayNode)
-
-    #self.ColorTable.connect("currentNodeChanged(vtkMRMLNode*)", "setColorNode(vtkMRMLNode*)")
-    self.ColorTable.connect("currentNodeChanged(vtkMRMLNode*)", self.onColorClicked)
+    self.ColorTable.connect("currentNodeChanged(vtkMRMLNode*)", self.on_color_clicked)
+    self.nodeThresholdSliderWidget.connect("valuesChanged(double, double)", self.sliderbar_changed)
+    self.nodeMinSizeSpinBox.connect("valueChanged(double)", self.min_size_changed)
+    self.nodeMaxSizeSpinBox.connect("valueChanged(double)", self.max_size_changed)
+    self.tableStartSpinBox.connect("valueChanged(double)", self.table_start_changed)
+    # self.nodeThresholdSliderWidget.connect('sliderReleased(double,double)', self.SliderBar)
     #self.ColorTable.setCurrentNodeID("vtkMRMLColorTableNode *")
     
     # self.regionButtons = self.regionsButtonGroup.buttons()
     # for regionButton in self.regionButtons:
-    #     regionButton.connect('clicked(bool)', self.regioncheckbox()) #self.onRegionSelect(r))
-    #self.regionsButtonGroup.connect('clicked(bool)', self.regioncheckbox())
+    #     regionButton.connect('clicked(bool)', self.region_checkbox()) #self.on_region_select(r))
+    #self.regionsButtonGroup.connect('clicked(bool)', self.region_checkbox())
 
-    #self.fileButton.connect('clicked(bool)', self.onFileLoad)
-    #self.inputJson.connect('browse()', self.onSelect)
+    #self.inputJson.connect('browse()', self.on_select)
     
     # Add vertical spacer
     self.layout.addStretch(1)
     # Refresh Apply button state
-    self.onSelect()
-    #self.onFileLoad()
+    self.applyButton.enabled = self.inputSelector.currentNode()
+    #self.on_select()
+    self.file_path = ""
+    self.header = None
 
-    #self.regioncheckbox()
+    #self.region_checkbox()
 
     #
     # Get the brain regions dynamically
     #
+  def on_browse(self):
+    try:
+        self.fileImport.addCurrentPathToHistory()
+        self.fileExport.addCurrentPathToHistory()
+        self.statusLabel.plainText = ''
+    except Exception as e:
+      #self.addLog("Unexpected error: {0}".format(e.message))
+      import traceback
+      traceback.print_exc()
 
-  def regioncheckbox(self,r):
+  def region_checkbox(self,r):
     for r in self.regions:
-        print ("Thank you! ")
-    #self.regionsButtonGroup.connect('toggled(bool)', self.onApplyButton)
+        print (" Thank you! ")
+    #self.regionsButtonGroup.connect('toggled(bool)', self.on_apply_button)
 
   def cleanup(self):
     pass
 
-  def onSelect(self):
-    self.applyButton.enabled = self.inputSelector.currentNode() and self.outputSelector.currentNode() #and self.inputJson.clicked()
+  def on_header_select(self, header):
+    if self.headerCheckBox.checked == True:
+        header = True
 
-  # def onMouseClick(self):
-  #   self.nodeButton.enabled = self.nodeButton.mousePressEvent()
+    else:
+        header = False
 
-  def onColorClicked(self):
-    global colorMap
-    colorMap = slicer.qMRMLColorPickerWidget()
-    colorMap.currentColorNode()
-    print colorMap
+    self.logic.set_header_state(header)
+    return header
+
+  def on_select(self, table):
+    print ('table', table)
+    self.header = self.on_header_select(self.header)
+    print ('header state', self.header)
+    self.logic.set_header_state(self.header)
+    self.logic.set_user_table(table)
+    self.logic.update()
+
+  def on_color_clicked(self, color_map):    
+    #print (color_map)
+    self.logic.set_color_map(color_map)
+    self.logic.update()
+    
+  def on_apply_button(self):
     self.logic.run_all()
 
-    # displayNode = slicer.mrmlScene.CreateNodeByClass('vtkMRMLColorTableNode')
-    # displayNode.SetScene(slicer.mrmlScene)
-    # ColorTableLabel = slicer.util.getNode('vtkMRMLColorTableNodeRainbow')
-    # #displayNode.SetAndObserveColorNodeID(ColorTableLabel.GetID())
-    # slicer.mrmlScene.AddNode(ColorTableLabel)
-    # #label.SetAndObserveDisplayNodeID(ColorTableLabel.GetID())
-    # for color in ['vtkMRMLColorTableNode']:
-    #     slicer.app.layoutManager().sliceWidget(color)
-    #     #slicer.app.layoutManager().sliceWidget(color).GetSliceCompositeNode().SetLabelVolumeID(label.GetID())
-    #     #slicer.app.layoutManager().sliceWidget(color).GetSliceCompositeNode().SetLabelOpacity(0.6)
-
-
-
-
-
-
-
-
-
-
-
-    # self.lookupTable = vtk.vtkLookupTable()
-    # self.lookupTable.SetNumberOfTableValues(20)
-    # self.lookupTable.Build()
-    #self.ColorTable.Build(self.lookupTable)
-    #self.ColorTable.currentColorNodeID()
-
-
-
-    # if not self.ColorTable == "":
-    #   #self.ColorTable.GetColor()
-    #   self.ColorTable.selectCommand = self.addStructure
-    # else:
-    #   #self.ColorTable.colorNode = colorNode
-    #   self.ColorTable.parent.populate()
-    #   self.ColorTable.parent.show()
-    #   self.ColorTable.parent.raise_()
-
-
-    
-    #self.mrmlScene.SetColorNodeID( self.ColorTable.currentNodeId)
-    
-    #self.logic.store_CoordInList(self.x, self.y, self.z, segmentationNode)
-    #self.table = vtk.vtkColorTable()
-    #self.table.DeepCopy(self.segmentationNode.GetColor().GetColorTable())
-    #table = self.ColorTable.nodeTypes.GetColorTable()
-    #self.ColorTable.GetColor()
-
-  def onApplyButton(self):
-    logic = visuThreeDLogic()
-    #enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
-    #imageThreshold = self.imageThresholdSliderWidget.value
-    # logic.run(self.inputSelector.currentNode(), self.outputSelector.currentNode(), imageThreshold, enableScreenshotsFlag)
-    #logic.store_CoordInList(self.x,self.y,self.z)
-    #self.logic.ThreeD_View()
-    logic.run()
-
-  def onSearch(self, value):
-    # global visuHText
-    #visuHText = QLabel(self.tr("..."))
-    #visuText.text(repr(value))
+  def on_search(self, value):
     print(value)
-    # visuHText = self.regionSearchBox.text(str(value))
-    # print visuHText
-    # logic = visuThreeDLogic()
-    self.logic.filterVisuHierarchyMap(value)
-    # for i in self.regions:
-    #     self.regionsButtonGroup.removeButton(1)
+    self.logic.filter_visu_hierarchyMap(value)
 
-    # seartchRegionList = searchRegion.split()
-    # for idx, j in enumerate(self.regions):
-    #     print type(self.regions)
-    #     rname = j["name"].lower()
-    #     print (type(rname))
-    #     if reduce(lambda x,y: x and (rname.find(y.lower())!=-1), [True] + searchRegionList):
-    #         self.regions.addItem(j["name"], idx)
-
-
-  def onFileLoad(self):
+  def on_file_load(self, path_to_json):
+    path_to_json = self.fileImport.currentPath
+    self.logic.set_input_json(path_to_json)
+    self.logic.update()
+    print ('The current path is:', path_to_json)
     
-    #path = self.inputJson.getFileName(None, "File", "", "JSON File (*.json)")
-    #directory = os.path.dirname(path)
-    #basename = os.path.basename(path)
-    #self.inputJson.addCurrentPathToHistory()
-    logic = visuThreeDLogic()
-    logic.readCoord_JsonFile(coord)
-    #self.fileButton.enabled = self.inputJson
-
-  def onSelectAllRegionsButton(self):
+  def on_select_all_regionsButton(self):
     regionButtons = self.regionsButtonGroup.buttons()
     for regionButton in regionButtons:
         regionButton.checked = True
 
-  def onSelectNoRegionsButton(self):
+  def on_select_no_regionsButton(self):
     regionButtons = self.regionsButtonGroup.buttons()
     for regionButton in regionButtons:
         regionButton.checked = False
  
-  def onRegionSelect(self, checkbox):
-    
+  def on_region_select(self, checkbox):
     print(checkbox)
     global text 
-    logic = visuThreeDLogic()
+    # logic = visuThreeDLogic()
     #regionButtons = self.regionsButtonGroup.buttons()
     checkedButtonId = self.regionsButtonGroup.checkedId()
 
@@ -508,65 +480,33 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
             print ('the checked region is :', text)
             logic.run()
 
-        # # if no checkbox is checked, checkedId returns -1
-        # else:
-
-        #     text = ""
-        #     print('No region is selected')
     #logic.run()
     print (checkedButtonId)
     print ('the checked region is', text)
     return text
 
+  def sliderbar_changed(self, newMin, newMax): #node_range):
+    self.logic.set_range(newMin, newMax)
+    #self.logic.set_sphere_radius(self.max_size)
+    self.logic.update()
 
+  def min_size_changed(self, min_size):
+    self.logic.set_min_size(min_size)
+    self.logic.update()
 
-    # for r in range(len(self.regions)):
-    #     # buttonChecked = self.regionsButtonGroup.buttonClicked(r)
-    #     # print buttonChecked
-    #     if checkedButton == True:
-    #         text = 'seed.left.frontal'
-    #         logic.run
-    # print (regionButtons.buttons(1))
-    # for button in regionButtons:
-    #     if regionButtons[1].checked == True:
-    #         text = 'seed.left.frontal'
-    #         logic.run
-        # if regionButtons['seed left frontal'].isChecked():
-        #     text = 'seed.left.frontal'
-        #     logic.run
-        # else:
-        #     print ('not the correct checkBox')
-        # if (self.regionButtons[r].isChecked()):
-        #     text = 'seed.left.frontal'
-        #     logic.run()
-    
-    # elif self.regionButtons['seed right frontal'].isChecked():
-    #   text = 'seed.right.frontal'
-    #   logic.run()
+  def max_size_changed(self, max_size):
+    self.logic.set_max_size(max_size)
+    # self.logic.create_node_actors()
+    #self.logic.set_sphere_radius()
+    self.logic.update()
 
-    # elif self.regionButtons['seed left occipital'].isChecked():
-    #   text = 'seed.left.occipital'
-    #   logic.run()
-
-    # elif self.regionButtons['seed right occipital'].isChecked():
-    #   text = 'seed.right.occipital'
-    #   logic.run()
-
-    # elif self.regionButtons['seed left parietal'].isChecked():
-    #   text = 'seed.left.parietal'
-    #   logic.run()
-    # else:
-    #   logic.run()
-
-    #segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, False)
-    #return text
-
-  #text = onRegionSelect(text)
+  def table_start_changed(self, table_start):
+    self.logic.set_table_start(table_start)
+    self.logic.update()
 
 #
 # visuThreeDLogic
 #
-
 class visuThreeDLogic(ScriptedLoadableModuleLogic):
   """This class should implement all the actual
   computation done by your module.  The interface
@@ -582,155 +522,164 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     self.x = []
     self.y = []
     self.z = []
-    self.segmentationNode = slicer.vtkMRMLSegmentationNode()
+    self.segmentationNode = slicer.vtkMRMLModelDisplayNode()
     self.index = []
     self.position = []
     self.visu = []
+
+    self.subject_index = 0
+    self.min_column = 1
+    self.max_column = 79
+
+    # self.subject_index = 0
+    # self.min_column = 0
+    # self.max_column = 78
+
+    #self.header = None
+    # self.set_header_state(self.header)
+    # if self.header == True:
+    #     self.subject_index = 1
+    #     self.min_column = 1
+    #     self.max_column = 79
+    # else:
+    #     self.subject_index = 0
+    #     self.min_column = 0
+    #     self.max_column = 78
+
     # self.text = raw_input("Enter region name to visualize: ")
     #self.text = ''
     #widget = visuThreeDWidget()
     #self.text = widget.
-    #self.text = 'seed.left.frontal.'
+    #self.text = 'seed.left.frontal.' 
     #self.text = visuThreeDWidget.text 
+
     self.path_to_json ='/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json'
-    self.user_file = '/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv'
-    self.user_csvFile = open(self.user_file, "r")
-    #self.path_to_json2 ='/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph3D_properties.json'
-    #json_files = [pos_json for pos_json in os.listdir(path_to_json) if pos_json.endswith('.json')]
-    #print(json_files) 
-
-    #d3 = self.readName_JsonFile()
-    # # print(d3)
-    #print(json.dumps(d3, sort_keys=True, indent=4))
-
-    #Open json file just once and not multiple times
-    self.nodeGraphArray = []
-    with open(self.path_to_json, "r") as dct:
-        self.nodeGraphArray = json.load(dct)
+    self.jep = JEP.json_extract_properties()
+    #self.path_to_json = None
+    #self.path = None
+    # self.path_to_json = self.set_input_json(self.path_to_json)
+    # #self.path_to_json = self.set_input_json(self.path_to_json).encode('utf-8')
+    # self.node_graph_array = []
+    # with open(self.path_to_json, "r") as json_file:
+    #     self.node_graph_array = json.load(json_file)
 
     #Open json file just once and not multiple times
     
-    #d3 = self.createMatrixRowMap(self.nodeGraphArray)
-    # d3 = self.CreateNodeDegreeMap(self.nodeDegreeArray)
+    #d3 = self.create_matrix_rowMap(self.nodeGraphArray)
+    # d3 = self.create_node_degreeMap(self.nodeDegreeArray)
     # print(json.dumps(d3, sort_keys=True, indent=4))
-    #d5 = self.readName_JsonFile(self.nodeGraphArray)
+    #d5 = self.read_name_jsonFile(self.nodeGraphArray)
     #print(json.dumps(d5, sort_keys=True, indent=4))
+    #self.set_input_json(self.path_to_json)
+    self.set_node_graph_array()
 
     # call function create MatrixRowMap 
     # indexes the json file by Matrix Row
-    self.matrixRowMap = self.createMatrixRowMap(self.nodeGraphArray)
+    # self.set_node_graph_array()
+    # self.matrixRowMap = self.create_matrix_rowMap(self.node_graph_array)
+    self.set_matrix_row_map()
 
     # call function create VisuHierarchyMap 
     # indexes the json file by VisuHierarchy
-    self.visuHierarchyMap = self.createVisuHierarchyMap(self.nodeGraphArray)
-    self.visuHierarchyMapMatches = []
+    # self.visuHierarchyMap = self.create_visu_hierarchyMap(self.node_graph_array)  
+    self.set_matrix_hierarchy_map()  
 
     #print(json.dumps(self.visuHierarchyMap, sort_keys=True, indent=4))
 
     # Initialize an empty filtered VisuHierarchy Map  
     self.filteredVisuHierarchy = {}
 
-    # Map that is shown every time one of the 2 boxes (index by matrixRow or by VisuHierarchy)
-    # is checked
-    node = 'enter node'
-    self.nodeGraphFilteredArray = {"nameN": {
-        "node": node, #shows the entire node (1 section in json file)
-        "visible": True #shown by default
-    }}
+    self.color_map = None
+    self.user_table = None
+    self.vtk_spheres = None
+    self.header = False
+    self.node_size = 7
+    self.min_size = 1
+    self.max_size = 7
+    self.node_min = 0
+    self.node_max = 0.6
 
-    self.user_file = '/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv'
+  def set_input_json(self, path_to_json):
+    self.path_to_json = path_to_json
+    #self.path = path_to_json.encode('utf-8')
+    #self.path_to_json = path_to_json
+    print('the path is:', path_to_json)
+    #print('the path is:', self.path)
+    #self.path_to_json = self.set_input_json(self.path_to_json).encode('utf-8')
 
-    #self.nodeGraphArray = []
+  def set_node_graph_array(self):
+    self.node_graph_array = []
+    #path = self.set_input_json(self.path_to_json)
+    #self.path = self.path_to_json.encode('utf-8')
+    with open(self.path_to_json, "r") as json_file:
+        self.node_graph_array = json.load(json_file)
+    #self.node_graph_array = node_graph_array
+    #print ('node graph array:', self.node_graph_array)
 
+  def set_matrix_row_map(self):
+    self.matrixRowMap = self.create_matrix_rowMap(self.node_graph_array)
 
+  def set_matrix_hierarchy_map(self):
+    self.visuHierarchyMap = self.create_visu_hierarchyMap(self.node_graph_array)
 
-    #self.user_csvFile = open(self.user_file, "r")
+  def set_color_map(self, color_map):
+    self.color_map = color_map
 
-    self.read_csvFile(self.user_csvFile)
+  def set_range(self,newMin, newMax):
+    self.node_min = newMin
+    self.node_max = newMax
 
-    self.write_json()
+  def set_user_file(self, userfile):
+    self.user_file = userfile
+    self.jep = JEP.json_extract_properties()
+    self.jep.set_csv_file(self.user_file)
+    self.jep.read_csv()
+    #print(self.jep.get_subject_content(1))
+    # jep.set_output_directory('/work/wprummel/data/maria5/EBDS_CIVILITY')
 
-    #def read_csvFile(self, user_csvFile):
-  def read_csvFile(self, user_csvFile):
+  def set_header_state(self, header):
+    self.header = header
 
-    with self.user_csvFile as table:
+  # Store the values of our Table Node in an array : self.values
+  def set_user_table(self, table):
+    self.set_table_index()
+    self.jep.set_table(table)
 
-        self.user_csvFile = open(self.user_file, "r")
- 
-        self.eigenVectCenter = csv.reader(table, delimiter=',')
-        #line_count = 2
-        i=2
-        subject = []
-        j=1
+  def set_table_start(self, table_start):
+    self.min_column = table_start
 
-        for j in self.eigenVectCenter:
+  def set_table_index(self):
+    self.set_header_state(self.header)
+    # if self.header == True:
+    #     self.subject_index = 1
+    # else:
+    if self.header == False:
+        #self.subject_index = 0
+        self.min_column = self.set_table_start(self.min_column)
+        # self.min_column = 0
+        self.max_column = 78
+    else:
+        self.subject_index = 1
+        # self.min_column = 1
+        self.max_column = 79
+    return self.subject_index
 
-            #subject.append({", ".join(j)})
-            subject.append(j)
+  def set_minprop_value(self, minVal):
+    #self.set_user_table(self.user_table)
+    self.minVal = 0
 
-            #subject.append(self.eigenVectCenter[2][j])
-        #for row in self.eigenVectCenter:
+  def update(self):
+    self.set_table_index()
+    self.set_sphere_radius(self.node_max)
+    self.set_node_actors_properties()
+    self.render()
 
-        # if line_count == 2:
-
-        #     print({", ".join(row)})
-                #line_count += 1
-            
-            # else:
-
-            #     print( {row[2]})
-            #     line_count += 1
-    subjectCurrent = subject[1]
-
-    del subjectCurrent[0]
-    del subjectCurrent[0]
-    print subjectCurrent[1]
-    print ('Current subject is :', len(subjectCurrent))
-    print len(subjectCurrent)
-    #print (len(subject[1]))
-    return subjectCurrent
-  
-  def write_json(self):
-
-    node_properties = []
-    #node_properties = {}
-
-    #node_properties['MatrixRow'] = [self.get_node_index(self.nodeGraphArray)]
-    #matrixIndex = self.get_node_index(self.nodeGraphArray)
-    #matrixIndex.remove(-1)
-
-    eigenVect = self.read_csvFile(self.user_csvFile)
-
-    for index,eigen in enumerate(eigenVect, start =1):
-
-        node_properties.append({'MatrixRow' : index , 'properties' : {'scalars' : {'eigenVectCenter' : eigen}}})
-
-    print (node_properties) 
-    #return node_properties
-
-    # convert node_properties [list] to dictionary 
-    #it = iter(node_properties)
-    #dict_prop = dict(zip(it,it)) 
-
-    # convert into json
-    json_prop = json.dumps(node_properties, sort_keys=True, indent=4)
-    print (json_prop)
-
-    # write json data to file
-    with open('extract_node_properties.json', 'w') as f:
-        json.dump(node_properties,f)
-
-
-    # Call filter function
-    # d5=self.filterVisuHierarchyMap(self.nodeGraphArray)
-    # print(json.dumps(d5, sort_keys=True, indent=4))
-
-  def get_node_index(self, nodeGraphArray):
+  def get_node_index(self, node_graph_array):
     
     nodeIndex = []
-    d_row = self.createMatrixRowMap(self.nodeGraphArray)   
+    d_row = self.create_matrix_rowMap(self.node_graph_array)   
+    
     #key = "MatrixRow"  
-
     for key in d_row.keys():
 
         nodeIndex.append(key) 
@@ -738,64 +687,48 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     return nodeIndex
 
   # Map that indexes the json file by Matrix Row
-  def createMatrixRowMap(self, nodeGraphArray):
-    # with open(self.path_to_json, "r") as dct:
-    #with open(path, "r") as json_file:
-      #Stores the json data in a dictionnary
-      #data = json.load(json_file)
-      #data = dct.read()
-      # k = json.load(dct)      
+  def create_matrix_rowMap(self, node_graph_array):
+    
       d2 = {}      
-      # for i, in range(len(k)):
 
       # i is the index, node is the element
-      for i,node in enumerate(nodeGraphArray):
+      for i,node in enumerate(node_graph_array):
         #order dictionnary by Matrix Row
         d2[node["MatrixRow"]] = node        
 
-      # Iterates on the reordered dictionnary d2  
-      # for j in range(1,len(d2)):
-      #   #d2[j].get('coord')
-      #   #d2.update()
-      #   coord.append(list(d2[j].get('coord')))
-      #   j+=1
-      return d2#coord
+      return d2
 
   # Map that indexes the json file by visuHierarchy name
-  def createVisuHierarchyMap(self, nodeGraphArray):
-    # with open(self.path_to_json, "r") as dct:
-    #with open(path, "r") as json_file:
-      #Stores the json data in a dictionnary
-      #data = json.load(json_file)
-      #data = dct.read()
-      # k = json.load(dct)      
+  def create_visu_hierarchyMap(self, node_graph_array):
+ 
       d3 = {}      
-      # for i, in range(len(k)):
 
       # i is the index, node is the element
-      for i,node in enumerate(nodeGraphArray):
+      for i,node in enumerate(node_graph_array):
         #order dictionnary by Matrix Row
         if(node["VisuHierarchy"] not in d3):
             d3[node["VisuHierarchy"]] = []
         d3[node["VisuHierarchy"]].append(node)        
 
-      return d3#coord
+      return d3
 
   # filter function linked to the search text for visuHierarchy checkbox
-  def filterVisuHierarchyMap(self, search_text):
+  def filter_visu_hierarchyMap(self, search_text):
 
     if(search_text is not None):
         self.visuHierarchyMapMatches = []
         print(search_text)
+
         for key in self.visuHierarchyMap:
             regex = ".*" + search_text + ".*"
+
             if(len(re.findall(regex, key)) > 0):
                 self.visuHierarchyMapMatches.append(key)
 
-
         print(self.visuHierarchyMapMatches)
 
-  def CreateNodeDegreeMap(self, nodeDegreeArray):
+# function NEVER CALLED
+  def create_node_degreeMap(self, nodeDegreeArray):
 
     row = {}     
     node_degree = []
@@ -808,55 +741,13 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
 
     value1 = row['properties']
     value2 = value1['scalars']
-    node_degree = value2['node_degree'] 
-
-
-    # for key, value in row.items():
-
-    #     node_degree.append(value)
-    #     print (node_degree)
-  
-
-    # for i,node in enumerate(nodeDegreeArray):
-    #     #order dictionnary by Matrix Row
-    #     if(node["Scalars"] not in node_degree):
-    #         node_degree[node["Scalars"]] = []
-    #     node_degree[node["Scalars"]].append(node)          
+    node_degree = value2['node_degree']         
 
     return node_degree
 
-    # self.filteredVisuHier = {}
-    # visuDict = self.createVisuHierarchyMap(self.nodeGraphArray)
-    # #print visuDict
-    # #visuHText = 'seed.left.frontal'
-    # for visuHText in visuDict.keys():
-    # #for node in nodeGraphArray:
-    #     #f(visuHText in visuDict.keys()): # this is the regex
-    #     #if re.findall(node,visuHText):
-    #     self.filteredVisuHier = visuDict.get(visuHText, None)
-    #         #self.filteredVisuHier.add()
-    #         #self.filteredVisuHier[node["name"]] = node
-    #         #print self.filteredVisuHier
-    # return self.filteredVisuHier
-
-  # V1 Read Region Names in json file
-  # def readName_JsonFile(self, nodeGraphArray):
-  #   matrixDict = self.createMatrixRowMap(self.nodeGraphArray)
-  #   #print (json.dumps(matrixDict, sort_keys=True, indent=4))
-  #   nameRegion = []
-
-  #   for name in matrixDict:
-
-  #       nameRegion.append((matrixDict[name].get('VisuHierarchy')))
-  #       regions = []
-  #       for name in nameRegion:
-  #           if name not in regions:
-  #               regions.append(name)
-    #print self.filteredVisuHier
-    #return self.filteredVisuHier
-  # V2 Read Region Names in json file
-  def readName_JsonFile(self, nodeGraphArray):
-    visuDict = self.createVisuHierarchyMap(self.nodeGraphArray)
+# function NEVER CALLED
+  def read_name_jsonFile(self, node_graph_array):
+    visuDict = self.create_visu_hierarchyMap(self.node_graph_array)
     #print (json.dumps(matrixDict, sort_keys=True, indent=4))
     nameRegion = []
     for key in visuDict.keys():
@@ -869,9 +760,10 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     print ('THIS: ' ,nameRegion)
     return nameRegion #regions
 
+# function NEVER CALLED
   #Read Region Coords in json file
-  def readCoord_JsonFile(self, nodeGraphArray):
-    matrixDict = self.createMatrixRowMap(self.nodeGraphArray)
+  def read_coord_jsonFile(self, node_graph_array):
+    matrixDict = self.create_matrix_rowMap(self.node_graph_array)
     #print (json.dumps(matrixDict, sort_keys=True, indent=4))
     coordRegion = []
 
@@ -880,81 +772,13 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
         coordRegion.append((matrixDict[coord].get('coord')))
 
     return coordRegion
-
-    # # with open(self.path_to_json, "r") as dct:
-    # #     nodeGraph = json.load(dct)
-    #     d3 = {}
-    #     nameRegion = []
-    #     for ng in nodeGraph:
-    #     #order dictionnary by Matrix Row
-    #         d3[ng["MatrixRow"]] = ng
-
-    # # Iterates on the reordered dictionnary d3
-    # # Returns a list with region names in the right order
-    #     d4 = {}
-    #     d5 = {}
-    #     for ng in nodeGraph:
-
-    #         if ng["VisuHierarchy"] not in d4:
-    #             d4[ng["VisuHierarchy"]] = []
-
-    #         d4[ng["VisuHierarchy"]].append(ng)
-    #         print (json.dumps(d4,sort_keys=True, indent=4))
-    #         #print d4
-    #         #nameRegion.append(list(d5[ng].get('VisuHierarchy')))
-    #         #ng+=1
-        
-    #     for j in range(1,len(d4)):
-    #     #d2[j].get('coord')
-    #     #d2.update()
-    #         nameRegion.append(list(d4[j].get('VisuHierarchy')))
-    #     #d5=d4[self.text]
-    #     #nameRegion = d5["VisuHierarchy"]
-    #     #for rn in range(1,len(d4)):
-
-    #         #d4[rn].get('VisuHierarchy')
-    #         #d4.update()
-    #         #nameRegion.append(list(d4[ng].get('coord')))
-    #         #ng+=1
-
-
-    #   #self.data = json_file.read()
-    #   #self.coord = json.loads(d2, object_hook=self.decode_coord)
-    #   #self.newfile = json_file.copy()
-    # return nameRegion
-
-  # def getRegionName(self):
-  #   d5 = []
-  #   d4 = self.readName_JsonFile()
-  #   print d4["VisuHierarchy"]
-  #   #d4[1].get('VisuHierarchy')
-  #   #d5 = d4[]
-  #   for rn in range(1,len(d4)):
-  #       # if rn["VisuHierarchy"] not in d5:
-  #       #     d5[rn["VisuHierarchy"]] = []
-  #       #d5[rn["VisuHierarchy"]].append(rn)
-  #       #d5[rn["VisuHierarchy"]]
-  #       #d4[rn].get('VisuHierarchy')
-  #       #d4.update()
-  #       d5.append(list(d4[rn].get('VisuHierarchy')))
-  #       #rn+=1
-  #       print d5
-  #   return d5
-
   
-  #Store x,y,z coordinates in separate lists 
-  # def store_CoordInList(self,x, y, z):
-  #   coord = self.read_JsonFile(self.coord)
-  #   #text = 'seed.right.frontal.'
-  #   visu = []
-    #position = []
-    #index = []
-  def patternInVisualHierarchy(self):
+  def pattern_in_visualHierarchy(self):
     region = []
     position = []
     regionList = []
-    #regionList = self.readName_JsonFile(self.nodeGraphArray)
-    matrixDict = self.createMatrixRowMap(self.nodeGraphArray)
+    #regionList = self.read_name_jsonFile(self.node_graph_array)
+    matrixDict = self.create_matrix_rowMap(self.node_graph_array)
 
     for name in matrixDict:
 
@@ -971,32 +795,15 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
         print (text)
         position.append(1)
         print ('found match!')
-      else:
+      else: 
         position.append(0)
         print('no match')
     #print position
     return position
 
-
-  #   #liste = self.read_RegionJsonFile(self.liste)
-  #   i = 0
-  #   for i in range(len(self.liste)):
-  # # change each element type in liste, from unicode to string 
-  #     visu.append(self.liste[i].encode('utf-8'))
-  #   print (visu)
-  #   for pattern in visu:
-  #     if re.findall(pattern, self.text):
-  #     #index = visu.index('seed.right.frontal.')
-  #       position.append(1)
-  #       print ('found match!')
-  #     else:
-  #       position.append(0)
-  #       print('no match')
-  #   print position
-  #   return position
-
-  def getIndex(self, index):
-    position = self.patternInVisualHierarchy()
+#function NEVER CALLED
+  def get_index(self, index):
+    position = self.pattern_in_visualHierarchy()
     index = []
     print len(position)
     for i, e in enumerate(position):
@@ -1006,218 +813,223 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     print index
     return index
 
-  def store_CoordInList(self,x, y, z, segmentationNode ):
-    coord = self.readCoord_JsonFile(self.nodeGraphArray)
-    #print coord
-    index = self.getIndex(self.index)
-    print index
-    print len(index)
-    x = []
-    y = []
-    z = []
-    new_coord = []
-    ##### Dict
-    # d2 = {}
-    # d2[dct[0]["name"]] = dct[0]
-    slicer.mrmlScene.AddNode(self.segmentationNode)
-    stringArray = vtk.vtkStringArray()
-    #self.segmentationNode.GetSegmentIDs(stringArray)
-    segmentationNode.CreateDefaultDisplayNodes()
-    append=vtk.vtkAppendPolyData()
-    #colorVector = vtk.vtkVector3d()
-    # create a sub-node that contains all the display data by using GetDisplayNode()
-    segmentationDisplayNode = self.segmentationNode.GetDisplayNode()
+  def set_min_size(self, min_size):
+    self.min_size = min_size
+    print ("node min size is :", min_size)
 
-    for j in range(len(index)):
+  def set_max_size(self, max_size):
+    self.max_size = max_size
+    print ("node max size is :", max_size)
 
-        # color = (100, 150, 200)
-        # color = np.array(color, float) / 255
-        # try:
-        #     segmentationNode.SetColor(color)
-        # except AttributeError:  # older versions of Slicer
-        #     colorVector.Set(*color)
-        #     segmentationDisplayNode.SetColor(colorVector)
-      #string.append(self.index[j].encode('utf-8'))
-    #list_index.append(position.index(j))
-    #value = list_index[j]
-  #for value in (list_index):
-  # if a in visu_h :
-  #   a_index = np.where(np_visu_h==a)
-  #   print a_index
-        x.append(coord[index[j]][0])
-        y.append(coord[index[j]][1])
-        z.append(coord[index[j]][2])
-        new_coord.append([x[j],y[j],z[j]])
-        # for i in range(len(self.coord)):
-        #   x = self.x.append(self.coord[i][0])
-        #   y = self.y.append(self.coord[i][1])
-        #   z = self.z.append(self.coord[i][2])
-        threeDNode = vtk.vtkSphereSource()
-        threeDNode.SetCenter(new_coord[j])
-        threeDNode.SetRadius(7)
-        threeDNode.Update()
-        append.AddInputData(threeDNode.GetOutput())
-    #print coord
-    append.Update()
-    threeDNodeId = self.segmentationNode.AddSegmentFromClosedSurfaceRepresentation(append.GetOutput(), "Node", colorMap)#"Node",[0.0,1.0,1.0])
+  def get_node_max(self, node_max):
+    self.node_max = node_max
+    print ("node max size is :", node_max)
+
+  def set_node_size(self):
+    self.node_size = [self.min_size, self.max_size]
+
+  def create_node_actors(self):
+    lm = slicer.app.layoutManager()
+    threeDView = lm.threeDWidget(0).threeDView()
+    renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+    # Clear the renderer from previous actors
+    # renderer.RemoveAllViewProps()
+    # Generate an empty list to store each Sphere
+    self.vtk_spheres = []
     
-    #triangles = vtk.vtkTriangleFilter()
-    #triangles.SetInputConnection(segmentationDisplayNode.GetOutputPolyData())
-    #plyWriter = vtk.vtkPLYWriter()
-    #plyWriter.SetInputConnection(triangles.GetOutputPort())
-    #lut = vtk.vtkColorTable()
-    #lut.DeepCopy(segmentationDisplayNode.GetColor())
-    #lut.SetRange(segmentationDisplayNode.GetScalarRange())
-    #plyWriter.SetColorTable(lut)
-    #plyWriter.SetArrayName(segmentationDisplayNode.GetActiveScalarName())
-    #plyWriter.GetColors()
+    for node in self.node_graph_array:
 
-    #segmentationDisplayNode = self.segmentationNode.GetDisplayNode()
-    segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, True)
-    print ('the new coord are : ', new_coord)
-    return new_coord
+        if node['MatrixRow'] != -1:
 
-    # Plot all connectomes
-  def storeAll_CoordInList(self,x, y, z, segmentationNode ):
-    coord = self.readCoord_JsonFile(self.nodeGraphArray)
-    #print coord
-    #index = self.getIndex(self.index)
-    #print index
-    #print len(index)
-    #x = []
-    #y = []
-    #z = []
-    new_coord = []
-    ##### Dict
-    # d2 = {}
-    # d2[dct[0]["name"]] = dct[0]
-    slicer.mrmlScene.AddNode(self.segmentationNode)
-    #stringArray = vtk.vtkStringArray()
-    #self.segmentationNode.GetSegmentIDs(stringArray)
-    segmentationNode.CreateDefaultDisplayNodes()
-    append=vtk.vtkAppendPolyData()
-    #colorVector = vtk.vtkVector3d()
-    # create a sub-node that contains all the display data by using GetDisplayNode()
-    segmentationDisplayNode = self.segmentationNode.GetDisplayNode()
+            # Dictionnary of all the spheres
+            sphere = {}
 
-    for j in range(len(coord)):
+            sphere['source'] = vtk.vtkSphereSource()
+            sphere['source'].SetCenter(node['coord'])
+            sphere['source'].SetRadius(7)
 
-        # color = (100, 150, 200)
-        # color = np.array(color, float) / 255
-        # try:
-        #     segmentationNode.SetColor(color)
-        # except AttributeError:  # older versions of Slicer
-        #     colorVector.Set(*color)
-        #     segmentationDisplayNode.SetColor(colorVector)
-      #string.append(self.index[j].encode('utf-8'))
-    #list_index.append(position.index(j))
-    #value = list_index[j]
-  #for value in (list_index):
-  # if a in visu_h :
-  #   a_index = np.where(np_visu_h==a)
-  #   print a_index
-        x.append(coord[j][0])
-        y.append(coord[j][1])
-        z.append(coord[j][2])
-        new_coord.append([x[j],y[j],z[j]])
-        # for i in range(len(self.coord)):
-        #   x = self.x.append(self.coord[i][0])
-        #   y = self.y.append(self.coord[i][1])
-        #   z = self.z.append(self.coord[i][2])
-        threeDNode = vtk.vtkSphereSource()
-        threeDNode.SetCenter(new_coord[j])
-        threeDNode.SetRadius(7)
-        threeDNode.Update()
-        append.AddInputData(threeDNode.GetOutput())
-    #print coord
-    append.Update()
-    threeDNodeId = self.segmentationNode.AddSegmentFromClosedSurfaceRepresentation(append.GetOutput(), "Node", colorMap)#"Node",[0.0,1.0,1.0])
-    
-    #triangles = vtk.vtkTriangleFilter()
-    #triangles.SetInputConnection(segmentationDisplayNode.GetOutputPolyData())
-    #plyWriter = vtk.vtkPLYWriter()
-    #plyWriter.SetInputConnection(triangles.GetOutputPort())
-    #lut = vtk.vtkColorTable()
-    #lut.DeepCopy(segmentationDisplayNode.GetColor())
-    #lut.SetRange(segmentationDisplayNode.GetScalarRange())
-    #plyWriter.SetColorTable(lut)
-    #plyWriter.SetArrayName(segmentationDisplayNode.GetActiveScalarName())
-    #plyWriter.GetColors()
+            sphere['actor'] = vtk.vtkActor()
+            sphere_mapper = vtk.vtkPolyDataMapper()
+            
+            sphere_mapper.SetInputConnection(sphere['source'].GetOutputPort())
+            sphere['actor'].SetMapper(sphere_mapper)
+            
+            self.vtk_spheres.append(sphere)
 
-    #segmentationDisplayNode = self.segmentationNode.GetDisplayNode()
-    segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, True)
-    print ('the new coord are : ', new_coord)
-    return new_coord
+            renderer.AddActor(sphere['actor'])
+
+  def render(self):
+    lm = slicer.app.layoutManager()
+    threeDView = lm.threeDWidget(0).threeDView()
+    renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+    renderer.Render()
+
+  def set_sphere_radius(self, node_max):
+
+    value_list = self.jep.get_subject_values(self.subject_index, self.min_column, self.max_column)
+    #self.value_list = self.jep.get_values()
+    #self.value_list = self.set_user_table(self.user_table)
+    len_sphere_actors = len(self.vtk_spheres)
+    print('nbspheres:', len_sphere_actors)
+    print('nbvalues:', len(value_list))
+
+    for index in range(len_sphere_actors):
+
+        #prop_value = float(self.value_list[index])
+        if(index < len(value_list)):
+            prop_value = (value_list[index])
+            #prop_value = self.values[index]
+            vtk_sphere = self.vtk_spheres[index]
+
+            if (prop_value < self.node_min):    
+
+                vtk_sphere['source'].SetRadius(self.min_size)
+
+            elif (prop_value > self.node_max):
+
+                vtk_sphere['source'].SetRadius(self.max_size)
+
+            else:   
+
+                vtk_sphere['source'].SetRadius(((prop_value - self.node_min)/self.node_max)*(self.max_size - self.min_size) + self.min_size)
+
+  def set_node_actors_properties(self):
+    #self.value_list = self.jep.get_subject_values(self.subject_index, self.min_column, self.max_column)
+    value_list = self.jep.get_subject_values(self.subject_index, self.min_column, self.max_column)
+    self.range_list = [self.node_min, self.node_max]
+    if self.vtk_spheres and self.color_map and value_list:        
+
+        len_sphere_actors = len(self.vtk_spheres)
+        lookup_table = self.color_map.GetLookupTable()        
+        lookup_table.SetRange(self.node_min, self.node_max)
+
+        print('range:', lookup_table.GetRange())
+
+        for index, sphere in enumerate(self.vtk_spheres):
+            
+            color = [0,0,0]
+
+            #lookup_table.GetColor(float(self.value_list[index]),color)
+            lookup_table.GetColor(value_list[index],color)
+            sphere['actor'].GetProperty().SetColor(color) 
+
+  def set_min_coord(self):
+
+    coord_point1 = []
+    for node in self.node_graph_array:
+
+        if node['MatrixRow'] != -1:
+
+            min_coords = node['coord']
+            coord_point1.append(min_coords)
+    return coord_point1
+
+  def create_line_actors(self):
+    # cn : connect nodes
+    # cn = slicer.app.layoutManager()
+    # threeDView_cn = cn.threeDWidget(0).threeDView()
+    # renderer_cn = threeDView_cn.renderWindow().GetRenderers().GetFirstRenderer()
+    lm = slicer.app.layoutManager()
+    threeDView = lm.threeDWidget(0).threeDView()
+    renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+    #renderer.RemoveAllViewProps()
+    # Generate an empty list to store each Connection (line)
+    self.line_actors = []
+    self.tube_actors = []
+    min_coords = self.set_min_coord()
+    for node in self.node_graph_array:
+        for min_coord in min_coords:
+
+            if node['MatrixRow'] != -1:
+
+                #self.connexion_list = self.jep.get_subject_values(node['MatrixRow'], self.begin, self.end)
+                line = {}
+
+                line['source'] = vtk.vtkLineSource()
+                line['source'].SetPoint1(min_coord)
+
+                #node['MatrixRow']+= node['MatrixRow']
+                line['source'].SetPoint2(node['coord'])
+                #create mapper and actor    
+                line['actor'] = vtk.vtkActor()
+                line_mapper = vtk.vtkPolyDataMapper()
+
+                line_mapper.SetInputConnection(line['source'].GetOutputPort())
+                line['actor'].SetMapper(line_mapper)
+                line['actor'].GetProperty().SetOpacity(0.1)
+
+                self.line_actors.append(line)
+
+                # tube_filter = vtk.vtkTubeFilter()
+                # tube_filter.SetInputConnection(line_source.GetOutputPort())
+                # tube_filter.SetRadius(0.5)
+                # tube_filter.SetNumberOfSides(50)
+                # #tube_filter.Update()
+
+                # #create mapper and actor
+                # tube_actor = vtk.vtkActor()
+                # tube_mapper = vtk.vtkPolyDataMapper()
+
+                # tube_mapper.SetInputConnection(tube_filter.GetOutputPort())
+                # tube_actor.GetProperty().SetOpacity(0.5)
+                # tube_actor.SetMapper(tube_mapper)
+
+                # self.tube_actors.append(tube_actor)
+                renderer.AddActor(line['actor'])
+            # renderer_cn.AddActor(tube_actor)
+        #if node['MatrixRow'] == 1:
+  def render_cn(self):
+
+    cn = slicer.app.layoutManager()
+    threeDView_cn = cn.threeDWidget(0).threeDView()
+    renderer_cn = threeDView_cn.renderWindow().GetRenderers().GetFirstRenderer()
+    renderer_cn.Render()
 
 
 
-  def createColorMap(self):
+    # line_source = vtk.vtkLineSource() 
+    # line_source.SetPoint1(-38.649999999999999, 
+    #   -5.6799999999999997, 
+    #   50.939999999999998)
+    # #node['MatrixRow']+=1
+    # line_source.SetPoint2(41.369999999999997, 
+    #   -8.2100000000000009, 
+    #   52.090000000000003)
 
-    #self.segmentationNode.SetAndObserveColorNodeID('vkMRMLColorTableNodeRainbow')
-   
-    colorMap = slicer.vtkMRMLColorTableNode()
-    colorMap.SetTypeToUser()
-    colorMap.SetNumberOfColors(256)
-    colorMap.SetName("Color Map")
-    for i in range(0,255):
+    # #create mapper and actor    
+    # line_actor = vtk.vtkActor()
+    # line_mapper = vtk.vtkPolyDataMapper()
 
-        colorMap.SetColor(i, 0.0, 1 - (i+1e-16)/255.0, 1.0, 1.0)
+    # line_mapper.SetInputConnection(line_source.GetOutputPort())
+    # line_actor.SetMapper(line_mapper)
 
-    slicer.mrmlScene.AddNode(colorMap)
+    # tube_filter = vtk.vtkTubeFilter()
+    # tube_filter.SetInputConnection(line_source.GetOutputPort())
+    # tube_filter.SetRadius(0.5)
+    # tube_filter.SetNumberOfSides(50)
+    # tube_filter.Update()
 
+    # #create mapper and actor
+    # tube_actor = vtk.vtkActor()
+    # tube_mapper = vtk.vtkPolyDataMapper()
 
+    # tube_mapper.SetInputConnection(tube_filter.GetOutputPort())
+    # tube_actor.GetProperty().SetOpacity(0.5)
+    # tube_actor.SetMapper(tube_mapper)
 
-  #   #imposer une autre couleur
-  #   stringArray = vtk.vtkStringArray()
-  #   #self.segmentationNode.GetSegmentIDs(stringArray)
-  #   segmentationNode.CreateDefaultDisplayNodes()
-  #   append=vtk.vtkAppendPolyData()
-  #   colorVector = vtk.vtkVector3d()
+    # renderer_cn.AddActor(line_actor)
+    # renderer_cn.AddActor(tube_actor)
 
-  #   for j in range(len(index)):
+#function NEVER CALLED
+  def run_slider(self, imageThreshold):
+    self.coord_value_dic()
 
-  #       color = (100, 150, 200)
-  #       color = np.array(color, float) / 255
-  #       try:
-  #           segmentationNode.SetColor(color)
-  #       except AttributeError:  # older versions of Slicer
-  #           colorVector.Set(*color)
-  #           segmentationDisplayNode.SetColor(colorVector)
-  #     #string.append(self.index[j].encode('utf-8'))
-  #   #list_index.append(position.index(j))
-  #   #value = list_index[j]
-  # #for value in (list_index):
-  # # if a in visu_h :
-  # #   a_index = np.where(np_visu_h==a)
-  # #   print a_index
-  #       x.append(coord[index[j]][0])
-  #       y.append(coord[index[j]][1])
-  #       z.append(coord[index[j]][2])
-  #       new_coord.append([x[j],y[j],z[j]])
-  #       # for i in range(len(self.coord)):
-  #       #   x = self.x.append(self.coord[i][0])
-  #       #   y = self.y.append(self.coord[i][1])
-  #       #   z = self.z.append(self.coord[i][2])
-  #       threeDNode = vtk.vtkSphereSource()
-  #       threeDNode.SetCenter(new_coord[j])
-  #       threeDNode.SetRadius(7)
-  #       threeDNode.Update()
-  #       append.AddInputData(threeDNode.GetOutput())
-  #   #print coord
-  #   #print coord
-  #   append.Update()
-  #   threeDNodeId = self.segmentationNode.AddSegmentFromClosedSurfaceRepresentation(append.GetOutput(), "Node", colorVector)#, "Node",[0.0,1.0,1.0])
-  #   #segmentationDisplayNode = self.segmentationNode.GetDisplayNode()
-  #   segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, True)
-  #   print ('the new coord are : ', new_coord)
-  #   return new_coord
-
-  def run(self):
-    #self.patternInVisualHierarchy(self.position)
-    self.store_CoordInList(self.x,self.y,self.z, self.segmentationNode)
-    #self.ThreeD_View(self.segmentationNode)
-  def run_all(self):
-    self.storeAll_CoordInList(self.x,self.y,self.z, self.segmentationNode)
+  # def run_all(self):
+  #   visu_logic = slicer.modules.visuThreeDWidget.logic
+  #   visu_logic.set_user_file('/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv')
+  #   visu_logic.create_node_actors()
+  #   visu_logic.create_line_actors()
+  #   visu_logic.update()
 
 class visuThreeDTest(ScriptedLoadableModuleTest):
   """
@@ -1249,6 +1061,14 @@ class visuThreeDTest(ScriptedLoadableModuleTest):
     your test should break so they know that the region is needed.
     """
 
+    visu_logic = slicer.modules.visuThreeDWidget.logic
+    #visu_logic.set_user_table(self.table)
+    #visu_logic.set_user_file('/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv')
+    visu_logic.create_node_actors()
+    #visu_logic.create_line_actors()
+    visu_logic.update()
+    # visu_logic.set_node_range()
+
     # self.delayDisplay("Starting the test")
     # #
     # # first, get some data
@@ -1264,107 +1084,108 @@ class visuThreeDTest(ScriptedLoadableModuleTest):
     # logic = visuThreeDLogic()
     # self.assertIsNotNone( logic.hasImageData(volumeNode) )
     # self.delayDisplay('Test passed!')
-    import json
-    #Access json data
-    def decode_coord(dct):
-      if "coord" in dct:
-        return (dct["coord"])
-      return dct
 
-    def decode_hierarchy(dct):
-      if "VisuHierarchy" in dct:
-        return (dct["VisuHierarchy"])
-      return dct
+#     import json
+#     #Access json data
+#     def decode_coord(dct):
+#       if "coord" in dct:
+#         return (dct["coord"])
+#       return dct
 
-    def decode_name(dct):
-      if "name" in dct:
-        return (dct["name"])
-      return dct
+#     def decode_hierarchy(dct):
+#       if "VisuHierarchy" in dct:
+#         return (dct["VisuHierarchy"])
+#       return dct
 
-    #read json file
-    #def read_JsonFile():
-    coord = []
-    node_tag = []
-    with open("/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json", "r") as json_file:
-      #Stores the json data in a dictionnary
-      # data = json.load(json_file)
-      data = json_file.read()
-      coord = json.loads(data, object_hook=decode_coord)
-      node_tag = json.loads(data, object_hook=decode_name)
+#     def decode_name(dct):
+#       if "name" in dct:
+#         return (dct["name"])
+#       return dct
 
-#     chart = vtk.vtkChartXYZ()
-# view = vtk.vtkContextView()
-# view.GetRenderWindow().SetSize(400,300)
-# view.GetScene().AddItem(chart)
-# chart.SetGeometry(vtk.vtkRectf(75.0,20.0,250,260))
+#     #read json file
+#     #def read_JsonFile():
+#     coord = []
+#     node_tag = []
+#     with open("/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json", "r") as json_file:
+#       #Stores the json data in a dictionnary
+#       # data = json.load(json_file)
+#       data = json_file.read()
+#       coord = json.loads(data, object_hook=decode_coord)
+#       node_tag = json.loads(data, object_hook=decode_name)
 
-# table = vtk.vtkTable()
-# arrX=vtk.vtkFloatArray()
-# arrX.SetName("x")
-# table.AddColumn(arrX)
-# arrY=vtk.vtkFloatArray()
-# arrY.SetName("y")
-# table.AddColumn(arrY)
-# arrZ=vtk.vtkFloatArray()
-# arrZ.SetName("z")
-# table.AddColumn(arrZ)
+# #     chart = vtk.vtkChartXYZ()
+# # view = vtk.vtkContextView()
+# # view.GetRenderWindow().SetSize(400,300)
+# # view.GetScene().AddItem(chart)
+# # chart.SetGeometry(vtk.vtkRectf(75.0,20.0,250,260))
+
+# # table = vtk.vtkTable()
+# # arrX=vtk.vtkFloatArray()
+# # arrX.SetName("x")
+# # table.AddColumn(arrX)
+# # arrY=vtk.vtkFloatArray()
+# # arrY.SetName("y")
+# # table.AddColumn(arrY)
+# # arrZ=vtk.vtkFloatArray()
+# # arrZ.SetName("z")
+# # table.AddColumn(arrZ)
 
 
-    X=10
-    Y=10
-    Z=10
-    # x = [-38.65, 41.37]
-    # y = [-5.68,-8.21]
-    # z = [50.94,52.09]
-    x = []
-    y = []
-    z = []
-    for i in range(len(coord)):
-      x.append(coord[i][0])
-      y.append(coord[i][1])
-      z.append(coord[i][2])
+#     X=10
+#     Y=10
+#     Z=10
+#     # x = [-38.65, 41.37]
+#     # y = [-5.68,-8.21]
+#     # z = [50.94,52.09]
+#     x = []
+#     y = []
+#     z = []
+#     for i in range(len(coord)):
+#       x.append(coord[i][0])
+#       y.append(coord[i][1])
+#       z.append(coord[i][2])
 
-    liste_x = []
-    liste_y = []
-    liste_z = []
-    for i in range(len(x)):
-      delta_x = x[i]
-      delta_y = y[i]
-      delta_z = z[i]
-      liste_x.append(delta_x)
-      liste_y.append(delta_y)
-      liste_z.append(delta_z)
+#     liste_x = []
+#     liste_y = []
+#     liste_z = []
+#     for i in range(len(x)):
+#       delta_x = x[i]
+#       delta_y = y[i]
+#       delta_z = z[i]
+#       liste_x.append(delta_x)
+#       liste_y.append(delta_y)
+#       liste_z.append(delta_z)
 
-# numNodes=3
-# r=4
-# points_x=[]
-# table.SetNumberOfRows(numNodes)
-# for i in range(1):
-#   table.SetValue(i, 0, liste_x[i])
-#   table.SetValue(i, 1, liste_y[i]) 
-#   table.SetValue(i, 2, liste_z[i]) 
+# # numNodes=3
+# # r=4
+# # points_x=[]
+# # table.SetNumberOfRows(numNodes)
+# # for i in range(1):
+# #   table.SetValue(i, 0, liste_x[i])
+# #   table.SetValue(i, 1, liste_y[i]) 
+# #   table.SetValue(i, 2, liste_z[i]) 
 
-    #Create Segmentation node that stores a set of segments
-    segmentationNode = slicer.vtkMRMLSegmentationNode()
-    slicer.mrmlScene.AddNode(segmentationNode)
-    #enable node display
-    segmentationNode.CreateDefaultDisplayNodes()
-    #if we define a master volume loaded by the user
-    # segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(masterVolumeNode)
+#     #Create Segmentation node that stores a set of segments
+#     # segmentationNode = slicer.vtkMRMLSegmentationNode()
+#     # slicer.mrmlScene.AddNode(segmentationNode)
+#     #enable node display
+#     segmentationNode.CreateDefaultDisplayNodes()
+#     #if we define a master volume loaded by the user
+#     # segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(masterVolumeNode)
 
-    #Create nodes
-    #coord=[]
-    append=vtk.vtkAppendPolyData()
-    for i in range(len(liste_x)):
-      coord.append([liste_x[i], liste_y[i], liste_z[i]])
-      threeDNode = vtk.vtkSphereSource()
-      threeDNode.SetCenter(coord[i])
-      threeDNode.SetRadius(7)
-      threeDNode.Update()
-      append.AddInputData(threeDNode.GetOutput())
+#     #Create nodes
+#     #coord=[]
+#     append=vtk.vtkAppendPolyData()
+#     for i in range(len(liste_x)):
+#       coord.append([liste_x[i], liste_y[i], liste_z[i]])
+#       threeDNode = vtk.vtkSphereSource()
+#       threeDNode.SetCenter(coord[i])
+#       threeDNode.SetRadius(7)
+#       threeDNode.Update()
+#       append.AddInputData(threeDNode.GetOutput())
 
-    append.Update()
-    threeDNodeId = segmentationNode.AddSegmentFromClosedSurfaceRepresentation(append.GetOutput(), "Node",[0.0,1.0,1.0])
+#     append.Update()
+#     threeDNodeId = segmentationNode.AddSegmentFromClosedSurfaceRepresentation(append.GetOutput(), "Node",[0.0,1.0,1.0])
 
-    segmentationDisplayNode = segmentationNode.GetDisplayNode()
-    segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, False)
+#     segmentationDisplayNode = segmentationNode.GetDisplayNode()
+#     segmentationDisplayNode.SetSegmentVisibility(threeDNodeId, False)

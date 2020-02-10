@@ -8,16 +8,10 @@ jep.read_csv()
 
 print(jep.get_subject_content(1))
 
-# jep.store_index_list()
-
 jep.set_output_directory('/work/wprummel/data/maria5/EBDS_CIVILITY')
 
 jep.dict_write_json()
 
-# jep.get_nodeName_index()
-
 jep.get_values()
 
-
-#jep.name_to_index()
 
