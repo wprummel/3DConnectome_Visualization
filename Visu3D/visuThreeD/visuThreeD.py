@@ -382,7 +382,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     # default values
     self.logic = visuThreeDLogic()
     self.min_strength = 0.0
-    self.max_strength = 0.6
+    self.max_strength = 0.8
     self.connectionThresholdSliderWidget = ctk.ctkRangeWidget()
     self.connectionThresholdSliderWidget.singleStep = 0.01
     self.connectionThresholdSliderWidget.setValues(self.min_strength, self.max_strength)
@@ -431,7 +431,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     #self.nodeButton.connect('mouseclick(bool)', self.onMouseClick)
     #self.applyButton.connect('clicked(bool)', self.logic.store_CoordInList(self.x,self.y,self.z))
     #self.applyButton.connect('clicked(bool)', self.on_apply_button)  
-    self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.on_select)
+    self.inputSelector.connect("nodeActivated(vtkMRMLNode*)", self.on_select)
     #self.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.on_select)
     #self.regionsButtonGroup.connect('clicked()', self.region_checkbox())
     self.regionsButtonGroup.buttonClicked.connect(self.on_region_select)
@@ -449,8 +449,8 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     self.nodeMinSizeSpinBox.connect("valueChanged(double)", self.min_size_changed)
     self.nodeMaxSizeSpinBox.connect("valueChanged(double)", self.max_size_changed)
     self.tableStartSpinBox.connect("valueChanged(double)", self.table_start_changed)
-    self.matrixConnectSelector.connect("currentNodeChanged(vtkMRMLNode*)",self.on_select_matrix)
-    self.connectionThresholdSliderWidget.connect("valuesChanged(double, double)", self.sliderbar_changed)
+    self.matrixConnectSelector.connect("nodeActivated(vtkMRMLNode*)",self.on_select_matrix)
+    self.connectionThresholdSliderWidget.connect("valuesChanged(double, double)", self.sliderbar2_changed)
     self.connectionColorTable.connect("currentNodeChanged(vtkMRMLNode*)", self.on_connect_color_clicked)
     # self.nodeThresholdSliderWidget.connect('sliderReleased(double,double)', self.SliderBar)
     #self.ColorTable.setCurrentNodeID("vtkMRMLColorTableNode *")
@@ -504,16 +504,23 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     return header
 
   def on_select(self, table):
-    print ('table', table)
+    # print ('table', table)
+    #self.vtk_spheres = []
+    self.logic.remove_node_actors()
     self.header = self.on_header_select(self.header)
-    print ('header state', self.header)
+    # print ('header state', self.header)
     self.logic.set_header_state(self.header)
     self.logic.set_user_table(table)
+    self.logic.create_node_actors()
     self.logic.update()
 
   def on_select_matrix(self, connection_matrix):
-    #print ('matrix:', connection_matrix)
+    # print ('matrix:', connection_matrix)
+    self.logic.remove_line_tube_actors()
     self.logic.set_connection_matrix(connection_matrix)
+    ##self.logic.set_connection_matrix(connection_matrix)
+    self.logic.create_line_actors()
+    #self.logic.set_line_connection()
     self.logic.update()
 
   def on_node_color_clicked(self, color_map):    
@@ -571,6 +578,13 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
 
   def sliderbar_changed(self, newMin, newMax): #node_range):
     self.logic.set_range(newMin, newMax)
+    #self.logic.set_sphere_radius(self.max_size)
+    self.logic.update()
+
+  def sliderbar2_changed(self, lineMin, lineMax): #node_range):
+    self.logic.set_line_range(lineMin, lineMax)
+    #self.logic.set_link_line_actors()
+    #self.logic.set_range(newMin, newMax)
     #self.logic.set_sphere_radius(self.max_size)
     self.logic.update()
 
@@ -676,11 +690,13 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     self.filteredVisuHierarchy = {}
 
     #self.set_connection_matrix(self.connection_matrix)
-
+    #self.node_array = []
     self.node_color_map = None
     self.connect_color_map = None
     self.user_table = None
-    self.vtk_spheres = None
+    self.vtk_spheres = []
+    self.line_actors = []
+    self.tube_actors = []
     self.header = False
     self.connection_matrix = None
     #self.listOfCoordinates = []
@@ -689,6 +705,8 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     self.max_size = 7
     self.node_min = 0
     self.node_max = 0.6
+    self.line_min = 0
+    self.line_max = 0
 
   def set_input_json(self, path_to_json):
     self.path_to_json = path_to_json
@@ -700,15 +718,22 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
 
   def set_node_graph_array(self):
     self.node_graph_array = []
+    #node_array = {}
     #path = self.set_input_json(self.path_to_json)
     #self.path = self.path_to_json.encode('utf-8')
     with open(self.path_to_json, "r") as json_file:
         self.node_graph_array = json.load(json_file)
+        #node_array = json.load(json_file)
     #self.node_graph_array = node_graph_array
-    #print ('node graph array:', self.node_graph_array)
+    # print ('NODE ARRAY:', self.node_graph_array)
+    # print ('TYPE', type(self.node_graph_array))
 
   def set_matrix_row_map(self):
     self.matrixRowMap = self.create_matrix_rowMap(self.node_graph_array)
+    print (json.dumps(self.matrixRowMap, sort_keys=True, indent=4))
+    print('matrixRowMap:', type(self.matrixRowMap))
+    print ('NODE ARRAY:', self.node_array)
+    print ('TYPE', type(self.node_array))
 
   def set_matrix_hierarchy_map(self):
     self.visuHierarchyMap = self.create_visu_hierarchyMap(self.node_graph_array)
@@ -723,8 +748,20 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     self.node_min = newMin
     self.node_max = newMax
 
-  def set_user_file(self, userfile):
-    self.user_file = userfile
+  def set_line_range(self, lineMin, lineMax):
+    self.line_min = lineMin
+    self.line_max = lineMax
+    # connect = np.array(self.connection_matrix)
+    # min_connection_matrix = []
+    # for i,row in enumerate(connect):
+    #   for j,val in enumerate(row): 
+    #     min_connection_matrix.append(float(val))
+    # self.line_min = min(min_connection_matrix)
+    # self.line_max = max(min_connection_matrix)
+    # print('line min', line_min, 'line max', line_max)
+
+  def set_user_file(self, user_file):
+    self.user_file = user_file
     self.jep = JEP.json_extract_properties()
     self.jep.set_csv_file(self.user_file)
     self.jep.read_csv()
@@ -761,9 +798,10 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
   def set_connection_matrix(self, connection_matrix):
     #self.jep.set_table(connection_matrix)
     #self.connect = self.jep.set_matrix_connections(connection_matrix)
-    self.jep.set_matrix_connections(connection_matrix)
+    #self.set_table_index()
+    self.connection_matrix = self.jep.set_matrix_connections(connection_matrix)
     #print ('len connection list:', len(self.connections))
-    #print ('connection_matrix', connection_matrix)
+    #print ('connection_matrix', self.connection_matrix)
     #self.connections = self.jep.set_connections()
     # print ('connections:', self.connect)
     # return self.connect
@@ -773,12 +811,13 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
     self.minVal = 0
 
   def update(self):
+    #self.vtk_spheres.clear()
     self.set_table_index()
     self.set_sphere_radius(self.node_max)
     self.set_node_actors_properties()
     #self.create_line_actors()
+    self.set_line_connection(self.line_max)
     self.set_line_actors_properties()
-    self.set_line_connection()
     self.render()
 
   def get_node_index(self, node_graph_array):
@@ -796,14 +835,19 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
   # Map that indexes the json file by Matrix Row
   def create_matrix_rowMap(self, node_graph_array):
     
-      d2 = {}      
-
+      d2 = {}   
+      self.node_array = []
       # i is the index, node is the element
       for i,node in enumerate(node_graph_array):
         #order dictionnary by Matrix Row
-        d2[node["MatrixRow"]] = node        
-
-      return d2
+        if node["MatrixRow"] != -1:
+          d2[node["MatrixRow"]] = node
+          self.node_array.append(d2[node["MatrixRow"]])
+        # if node["MatrixRow"] == -1:
+        #   d = dict(d2)
+        #   del(d[node["MatrixRow"]])
+      print (self.node_array)
+      return d2 #self.node_array
 
   # Map that indexes the json file by visuHierarchy name
   def create_visu_hierarchyMap(self, node_graph_array):
@@ -912,12 +956,12 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
   def get_index(self, index):
     position = self.pattern_in_visualHierarchy()
     index = []
-    print len(position)
+    print (len(position))
     for i, e in enumerate(position):
       if e == 1:
         index.append(i)   
-    print len(index)
-    print index
+    print (len(index))
+    print (index)
     return index
 
   def set_min_size(self, min_size):
@@ -938,32 +982,32 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
   def create_node_actors(self):
     lm = slicer.app.layoutManager()
     threeDView = lm.threeDWidget(0).threeDView()
-    renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+    self.renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
     # Clear the renderer from previous actors
-    # renderer.RemoveAllViewProps()
+    #renderer.RemoveAllViewProps()
     # Generate an empty list to store each Sphere
+    print ('node graph:', self.node_array)
     self.vtk_spheres = []
-    
-    for node in self.node_graph_array:
+    for node in self.node_array:
 
-        if node['MatrixRow'] != -1:
+        #if node['MatrixRow'] != -1:
 
-            # Dictionnary of all the spheres
-            sphere = {}
+        # Dictionnary of all the spheres
+        sphere = {}
 
-            sphere['source'] = vtk.vtkSphereSource()
-            sphere['source'].SetCenter(node['coord'])
-            sphere['source'].SetRadius(7)
+        sphere['source'] = vtk.vtkSphereSource()
+        sphere['source'].SetCenter(node['coord'])
+        sphere['source'].SetRadius(7)
 
-            sphere['actor'] = vtk.vtkActor()
-            sphere_mapper = vtk.vtkPolyDataMapper()
-            
-            sphere_mapper.SetInputConnection(sphere['source'].GetOutputPort())
-            sphere['actor'].SetMapper(sphere_mapper)
-            
-            self.vtk_spheres.append(sphere)
+        sphere['actor'] = vtk.vtkActor()
+        sphere_mapper = vtk.vtkPolyDataMapper()
+        
+        sphere_mapper.SetInputConnection(sphere['source'].GetOutputPort())
+        sphere['actor'].SetMapper(sphere_mapper)
+        
+        self.vtk_spheres.append(sphere)
 
-            renderer.AddActor(sphere['actor'])
+        self.renderer.AddActor(sphere['actor'])
 
   def render(self):
     lm = slicer.app.layoutManager()
@@ -986,7 +1030,7 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
             prop_value = (value_list[index])
             vtk_sphere = self.vtk_spheres[index]
             #len_line_actors = len(self.line_actors)
-            line = self.line_actors[index]
+            #line = self.line_actors[index]
             # a = vtk_sphere['source'].GetCenter()
             # # print('sphere center:', a , type(a))
             # b = line['source'].GetPoint1()
@@ -1031,6 +1075,17 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
             lookup_table.GetColor(value_list[index],color)
             sphere['actor'].GetProperty().SetColor(color) 
 
+  def remove_node_actors(self):
+    #lm = slicer.app.layoutManager=()
+    # threeDView = lm.threeDWidget(0).threeDView()
+    # renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+
+    len_sphere_actors = len(self.vtk_spheres)
+    for index in range(len_sphere_actors):
+      vtk_sphere = self.vtk_spheres[index]
+      self.renderer.RemoveActor(vtk_sphere['actor'])
+    self.vtk_spheres.clear()
+
   def create_line_actors(self):
 
     lm = slicer.app.layoutManager()
@@ -1039,169 +1094,197 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
 
     self.line_actors = []
     self.tube_actors = []
+    self.node_graph_actors_lookup = -1*np.ones([len(self.node_array), len(self.node_array)], dtype=int)
 
     # By default each connection is connected to every node
-    for i, node_i in enumerate(self.node_graph_array):
+    for i, node_i in enumerate(self.node_array):
         current_line_actors = []
-        for j in range(i + 1, len(self.node_graph_array)):
-            node_j = self.node_graph_array[j]
+        #if node_i['MatrixRow'] != -1:
+        # We create a matrix of lines, giving possibility to pinpoint each line
+        # self.line_actors.append([])
+        # self.tube_actors.append([])
+        for j in range(i + 1, len(self.node_array)):
+            node_j = self.node_array[j]
             self.list_index = i
 
-            if node_i['MatrixRow'] != -1:
+            #if node_j['MatrixRow'] != -1:
+            # len(self.line_actors) is the index of the lines
+            self.node_graph_actors_lookup[i][j] =  len(self.line_actors)
+            # instantiate two dictionnaries
+            line = {}
+            tube = {}
 
-                # instantiate two dictionnaries
-                line = {}
-                tube = {}
+            line['source'] = vtk.vtkLineSource()
+            line['source'].SetPoint1(node_i['coord'])
 
-                line['source'] = vtk.vtkLineSource()
-                line['source'].SetPoint1(node_i['coord'])
+            line['source'].SetPoint2(node_j['coord'])
 
-                line['source'].SetPoint2(node_j['coord'])
+            line['seed'] = node_i
+            line['target'] = node_j
 
-                line['seed'] = node_i
-                line['target'] = node_j
+            #create mapper and actor    
+            line['actor'] = vtk.vtkActor()
+            line_mapper = vtk.vtkPolyDataMapper()
 
-                #create mapper and actor    
-                line['actor'] = vtk.vtkActor()
-                line_mapper = vtk.vtkPolyDataMapper()
+            line_mapper.SetInputConnection(line['source'].GetOutputPort())
+            line['actor'].SetMapper(line_mapper)
+            line['actor'].GetProperty().SetOpacity(0.1)
 
-                line_mapper.SetInputConnection(line['source'].GetOutputPort())
-                line['actor'].SetMapper(line_mapper)
-                line['actor'].GetProperty().SetOpacity(0.1)
+            renderer.AddActor(line['actor'])
 
-                renderer.AddActor(line['actor'])
+            self.line_actors.append(line)
 
-                self.line_actors.append(line)
+            # Add a tube around each line 
+            tube['filter'] = vtk.vtkTubeFilter()
+            tube['filter'].SetInputConnection(line['source'].GetOutputPort())
+            tube['filter'].SetRadius(0.5)
+            tube['filter'].SetNumberOfSides(50)
 
-                # Add a tube around each line 
-                tube['filter'] = vtk.vtkTubeFilter()
-                tube['filter'].SetInputConnection(line['source'].GetOutputPort())
-                tube['filter'].SetRadius(0.5)
-                tube['filter'].SetNumberOfSides(50)
+            #create mapper and actor
+            tube['actor'] = vtk.vtkActor()
+            tube['mapper'] = vtk.vtkPolyDataMapper()
 
-                #create mapper and actor
-                tube['actor'] = vtk.vtkActor()
-                tube['mapper'] = vtk.vtkPolyDataMapper()
+            tube['mapper'].SetInputConnection(tube['filter'].GetOutputPort())
+            tube['actor'] .GetProperty().SetOpacity(1)
+            tube['actor'] .SetMapper(tube['mapper'])
 
-                tube['mapper'].SetInputConnection(tube['filter'].GetOutputPort())
-                tube['actor'] .GetProperty().SetOpacity(1)
-                tube['actor'] .SetMapper(tube['mapper'])
+            renderer.AddActor(tube['actor'])
 
-                self.tube_actors.append(tube)
+            self.tube_actors.append(tube)
+    print('line number 3:', self.node_graph_actors_lookup[4])
+    print("test_line_Actors_len", self.node_graph_actors_lookup)
 
-                renderer.AddActor(tube['actor'])
+    #print ('line dictionnary:', self.line_actors)
 
-    #print ('line dictionnary:', line)
-
-  def set_line_connection(self):
-
+  def set_line_connection(self, line_max):
+    # lm = slicer.app.layoutManager()
+    # threeDView = lm.threeDWidget(0).threeDView()
+    # renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+    #self.create_line_actors()
     rows = []
-    positions = []
-    self.listOfCoordinates = []
+    ones = []
 
-    # Store data in array 
-    for row_index in range(len(self.jep.get_connection_rows(0))):     
+    connection_matrix_np = np.array(self.connection_matrix)
+    #min_connection_matrix = []#np.amin(connection_matrix_np)
+    #print ('min connection matrix:', connection_matrix_np)
+    # row_array = np.array(rows)
+    # print('row_array', row_array)
+    # print('valeurs non nulles:', np.nonzero(row_array))
+    # print('valeurs nulles:', np.where(row_array == 0, 0, 1))
 
-        row_content = self.jep.get_connection_rows(row_index)
-        position = row_content.index(0)
-        rows.append(row_content)
-        positions.append(position)
-    row_array = np.array(rows)
-    print('VAL:', len(row_array))
-    # lower triangle
-    lower_triangle = np.tril(row_array, -1)
-    print('lower triangle:', lower_triangle)
-    print ('number of rows', np.size(row_array, 0))
+    #upper_triangle = np.triu(connection_matrix_np, -1)
+    # print('upper triangle:', upper_triangle)
+    # print ('number of rows', np.size(row_array, 0))
 
-    # np.where returns a tuple of ndarrays
-    #selection_matrix = np.where(row_array!=0, 1, 0)
-    selection_matrix = np.where(row_array)
-    print (selection_matrix[0], selection_matrix[1])
+    # selection_matrix = len(connection_matrix_np)
+    # print ('selection_matrix', selection_matrix)
 
+    for i,row in enumerate(connection_matrix_np):
+      for j,val in enumerate(row): 
+        
+        # values = row 
+        
+        #print('valeurs row :', (row),'valeurs index:', i)
+
+        if self.node_graph_actors_lookup[i][j] != -1 :
+          #min_connection_matrix.append(float(val))
+          actor_index = self.node_graph_actors_lookup[i][j]
+          line = self.line_actors[actor_index]
+          #print('actor index:', self.line_actors[1])
+          tube = self.tube_actors[actor_index]
+
+          if (float(val) == 0):
+            line['actor'].SetVisibility(False)
+            tube['filter'].SetRadius(self.line_min)
+            tube['actor'].SetVisibility(False)
+            ones.append(line['actor'].GetVisibility())
+            #print('value in matrix is zero')
+
+          elif float(val)*100 < self.line_min:
+            line['actor'].SetVisibility(False)
+            tube['filter'].SetRadius(self.line_min)
+            tube['actor'].SetVisibility(False)
+            #print('5678')
+
+          elif float(val)*100 > self.line_max:
+            line['actor'].SetVisibility(True)
+            tube['filter'].SetRadius(self.line_max)
+            tube['actor'].SetVisibility(True)
+            #print('1234')
+
+          else: 
+            line['actor'].SetVisibility(True)
+            tube['filter'].SetRadius(((float(val) - self.line_min)/self.line_max)*(self.max_size - self.min_size) + self.min_size)
+            tube['actor'].SetVisibility(True) 
+            #print('0000')             
+            print(line['actor'].GetVisibility())
+            #print ('value in matrix is NOT zero')
+
+          
+          #print('len line', len(line))
+
+          # renderer.AddActor(line['actor'])
+          # renderer.AddActor(tube['actor'])
+
+    print ('ones:', len(ones))
     len_line_actors = len(self.line_actors)
     print('nblines:', len_line_actors)
+    #print ('min_connection_matrix', max(min_connection_matrix), 'len', len(min_connection_matrix)) 
 
+  def set_link_line_actors(self):
+    self.set_sphere_radius(self.node_max)
+    len_sphere_actors = len(self.vtk_spheres)
 
-    #zip the 2 arrays to get the exact coordinates where there is no connection
-    self.listOfCoordinates= list(zip(selection_matrix[0], selection_matrix[1]))
-    print ('len listOfCoordinates', len(self.listOfCoordinates))
+    for index in range(len_sphere_actors):
+      vtk_sphere = self.vtk_spheres[index]
+      line = self.line_actors[index]
+      tube = self.tube_actors[index]
 
-    for i in range (1,2):
-        line = self.line_actors[i]
-        tube = self.tube_actors[i]
-        lower_triangle = []
-        #iterations = (len(self.listOfCoordinates) - 1) - i
-        iterations = 2
-        row = i
-        col = 0
-        #lower_triangle = np.empty(dimension)
-
-        while iterations > 0:
-
-            lower_triangle.append(row_array[col][row])
-            #np.append(lower_triangle, row_array[row][col], axis = 0)
-            row += 1
-            col += 1
-            iterations -= 1
-              
-
-        if np.where(row_array == 0):
-            line['actor'].SetVisibility(False)
-            tube['actor'].SetVisibility(False)
-        else:
-            line['actor'].SetVisibility(True)
-            tube['actor'].SetVisibility(True)   
-    print ('lower triangle:', lower_triangle)  
-
-
-    # for index in range(len(self.listOfCoordinates)):
-    #     line = self.line_actors[index]
-    #     tube = self.tube_actors[index]
-    #     #print (self.listOfCoordinates[index]) 
-
-    #     #for i in range(len(self.vtk_spheres)):
-    #     #vtk_sphere = self.vtk_spheres[index]
-
-    #     line['coord'] = self.listOfCoordinates[index]
-
-    #     # If value in connection matrix is zero, then there is no connection
-    #     # We set the visibility off : False
-    #     if np.where(row_array == 0):
-    #     #if row_array == 0:
-    #         # a = line['source'].GetPoint1()
-    #         # b = line['source'].GetPoint2()
-    #         # print ('point 1:', a , 'point2 :', b )
-    #         line['actor'].SetVisibility(False)
-    #         tube['actor'].SetVisibility(False)
-
-    #     # elif vtk_sphere['actor'].SetVisibility(False):
-    #     #     line['actor'].SetVisibility(False)
-
-    #     else:
-    #         line['actor'].SetVisibility(True)
-    #         tube['actor'].SetVisibility(True)
+      if vtk_sphere['actor'].GetVisibility() == 0:
+        line['actor'].SetVisibility(False)
+        tube['actor'].SetVisibility(False)
 
   def set_line_actors_properties(self):
-    for row_index in range(len(self.jep.get_connection_rows(0))):    
+    connection_matrix_np = np.array(self.connection_matrix)
+    for i,row in enumerate(connection_matrix_np):
+      for j,val in enumerate(row):   
 
-        row_content = self.jep.get_connection_rows(row_index)
+        #row_content = self.jep.get_connection_rows(row_index)
 
-    if self.line_actors and self.connect_color_map: #and matrix:        
+        if self.line_actors and self.tube_actors and self.connect_color_map: #and matrix:        
+            len_line_actors = len(self.line_actors)
+            lookup_table = self.connect_color_map.GetLookupTable()        
+            lookup_table.SetRange(self.line_min, self.line_max)
 
-        len_line_actors = len(self.line_actors)
-        lookup_table = self.connect_color_map.GetLookupTable()        
-        #lookup_table.SetRange(self.node_min, self.node_max)
+            #print('range:', lookup_table.GetRange())
 
-        #print('range:', lookup_table.GetRange())
+            #for index, line in enumerate((self.listOfCoordinates)):
+            #for index in range(len_line_actors):
+                #line = self.line_actors[index]
+            if self.node_graph_actors_lookup[i][j] != -1 :
+              actor_index = self.node_graph_actors_lookup[i][j]
+              tube = self.tube_actors[actor_index]
+              color = [0,0,0]
 
-        #for index, line in enumerate((self.listOfCoordinates)):
-        for index in range(len(self.listOfCoordinates)):
-            line = self.line_actors[index]
-            color = [0,0,0]
+              #lookup_table.GetColor(float(self.value_list[index]),color)
+              lookup_table.GetColor(float(val), color)
+              #line['actor'].GetProperty().SetColor(color) 
+              tube['actor'].GetProperty().SetColor(color) 
 
-            #lookup_table.GetColor(float(self.value_list[index]),color)
-            lookup_table.GetColor(row_content[index], color)
-            line['actor'].GetProperty().SetColor(color) 
+
+  def remove_line_tube_actors(self):
+    lm = slicer.app.layoutManager()
+    threeDView = lm.threeDWidget(0).threeDView()
+    renderer = threeDView.renderWindow().GetRenderers().GetFirstRenderer()
+
+    len_line_actors = len(self.line_actors)
+    for index in range(len_line_actors):
+      vtk_line = self.line_actors[index]
+      vtk_tube = self.tube_actors[index]
+      renderer.RemoveActor(vtk_line['actor'])
+      renderer.RemoveActor(vtk_tube['actor'])
+    self.line_actors.clear()
+    self.tube_actors.clear()
 
 #function NEVER CALLED
   def run_slider(self, imageThreshold):
@@ -1245,13 +1328,13 @@ class visuThreeDTest(ScriptedLoadableModuleTest):
     """
 
     visu_logic = slicer.modules.visuThreeDWidget.logic
-    #visu_logic.set_user_table(self.table)
+    #visu_logic.set_user_table(self.user_table)
     #visu_logic.set_user_file('/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv')
-    visu_logic.set_user_file('/home/wprummel/Documents/neo-0042-4year_AvgSym_normFull.csv')
-    visu_logic.create_node_actors()
-    visu_logic.create_line_actors()
-    visu_logic.update()
-    # visu_logic.set_node_range()
+    #visu_logic.set_user_file('/Users/Wieke/Documents/visuThreeD/neo-0042-4year_AvgSym_normFull.csv')
+    # visu_logic.create_node_actors()
+    # visu_logic.create_line_actors()
+    # visu_logic.update()
+    #visu_logic.set_node_range()
 
     # self.delayDisplay("Starting the test")
     # #
