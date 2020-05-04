@@ -382,7 +382,7 @@ class visuThreeDWidget(ScriptedLoadableModuleWidget):
     # default values
     self.logic = visuThreeDLogic()
     self.min_strength = 0.0
-    self.max_strength = 0.8
+    self.max_strength = 1.2
     self.connectionThresholdSliderWidget = ctk.ctkRangeWidget()
     self.connectionThresholdSliderWidget.singleStep = 0.01
     self.connectionThresholdSliderWidget.setValues(self.min_strength, self.max_strength)
@@ -1195,26 +1195,29 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
 
           if (float(val) == 0):
             line['actor'].SetVisibility(False)
+            line['actor'].GetProperty().SetLineWidth(self.line_min)
             tube['filter'].SetRadius(self.line_min)
             tube['actor'].SetVisibility(False)
             ones.append(line['actor'].GetVisibility())
             #print('value in matrix is zero')
 
-          elif float(val)*100 < self.line_min:
+          elif float(val)*150 < self.line_min:
             line['actor'].SetVisibility(False)
+            line['actor'].GetProperty().SetLineWidth(self.line_min)
             tube['filter'].SetRadius(self.line_min)
             tube['actor'].SetVisibility(False)
             #print('5678')
 
-          elif float(val)*100 > self.line_max:
+          elif float(val)*150 > self.line_max:
             line['actor'].SetVisibility(True)
+            line['actor'].GetProperty().SetLineWidth(self.line_max)
             tube['filter'].SetRadius(self.line_max)
             tube['actor'].SetVisibility(True)
             #print('1234')
 
           else: 
             line['actor'].SetVisibility(True)
-            tube['filter'].SetRadius(((float(val) - self.line_min)/self.line_max)*(self.max_size - self.min_size) + self.min_size)
+            tube['filter'].SetRadius(((float(val) - self.line_min)/self.line_max)*(1.2 - self.min_size) + self.min_size)
             tube['actor'].SetVisibility(True) 
             #print('0000')             
             print(line['actor'].GetVisibility())
@@ -1267,7 +1270,8 @@ class visuThreeDLogic(ScriptedLoadableModuleLogic):
               color = [0,0,0]
 
               #lookup_table.GetColor(float(self.value_list[index]),color)
-              lookup_table.GetColor(float(val), color)
+              #lookup_table.GetColor(float(val), color)
+              lookup_table.GetColor(float(row[j]), color)
               #line['actor'].GetProperty().SetColor(color) 
               tube['actor'].GetProperty().SetColor(color) 
 
