@@ -21,22 +21,22 @@ The user can influence properties such as:
 •	change the connection distribution from default scale to log scale
 
 ### Node plotting after Json File and Node Table input
-<!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/node.png?raw=true) -->
+<!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/node.png?raw=true) -->
 
 ![nodes](./docs/nodes.png?raw=true)
 
 ### Connections and Nodes after connection matrix input
-<!-- ![brain_connectome](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/brain_connectome.gif?raw=true) -->
+<!-- ![brain_connectome](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/brain_connectome.gif?raw=true) -->
 
 ![brain_connectome](./docs/brain_connectome.png?raw=true)
 
 ### Default and log connection distribution
-<!-- ![connection_distributions](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/connection_distributions.gif?raw=true) -->
+<!-- ![connection_distributions](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/connection_distributions.gif?raw=true) -->
 
 ![connection_distributions](./docs/connection_distributions.png?raw=true)
 
 ### Connectome with brain sample data
-<!-- ![connectome_sample_data](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/connectome_sample_data.gif?raw=true) -->
+<!-- ![connectome_sample_data](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/connectome_sample_data.gif?raw=true) -->
 
 ![connectome_sample_data](./docs/connectome_sample_data.png?raw=true)
 
@@ -47,13 +47,13 @@ Select the "Brain Connectome Visualization" module in Slicer3D.
 
 #### Json file
 This is how the Json file should look like:
-<!-- ![sample_json_file](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/sample_json_file.gif?raw=true) -->
+<!-- ![sample_json_file](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/sample_json_file.gif?raw=true) -->
 
 ![sample_json_file](./docs/sample_json_file.png?raw=true)
 
 ### Connection matrix
 This is how the connection matrix (csv file) should look like:
-<!-- ![sample_connection_matrix](https://github.com/wprummel/3DConnectome_Visualization/tree/master/doc/sample_connection_matrix.gif?raw=true) -->
+<!-- ![sample_connection_matrix](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/sample_connection_matrix.gif?raw=true) -->
 
 ![sample_connection_matrix](./docs/sample_connection_matrix.png?raw=true)
 
