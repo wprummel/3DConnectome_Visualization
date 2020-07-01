@@ -7,15 +7,6 @@ This script extracts properties from the initial json file
 in order to associate an index (Matrix Rox) form the json, 
 with the corresponding node degree form another file
 """
-#self.path_to_json ='/work/wprummel/Tools/Test-files/Connectome_3D_Visualization/nodeGraph_3D.json'
-# self.user_file = '/work/maria5/EBDS_CIVILITY/DataShare/TestMatricesForVisualization/AAL78/PerNodeMetrics/Conte_EigenVectorCentrality_4Yr_AAL78Regions.csv'
-
-# #self.nodeGraphArray = []
-
-# self.user_csvFile = open(self.user_file, "r")
-# read_csvFile(self.user_csvFile)
-
-#def read_csvFile(self, user_csvFile):
 
 class json_extract_properties():
 
@@ -24,6 +15,7 @@ class json_extract_properties():
     self.output_directory = "out"
     self.csv_content = []
     self.matrix_content = []
+    self.max_column = 1
 
   def set_csv_file(self, csv_file):
     self.csv_file = csv_file
@@ -48,6 +40,7 @@ class json_extract_properties():
     table_content = []
     header_content = []
     self.max_column = table.GetNumberOfColumns()
+    print('number of columns', self.max_column)
 
     for i in range(table.GetNumberOfColumns()):
       header_content.append(table.GetColumnName(i))
@@ -60,45 +53,44 @@ class json_extract_properties():
         row_content.append(table.GetCellText(i, j))
       table_content.append(row_content)
 
-    print ('list of property values', table_content)
     self.csv_content = table_content
-    #self.matrix_content = table_content
+
+  def get_max_column(self):
+    #self.set_table(self.table)
+    return self.max_column
 
   def set_matrix_connections(self, connection_matrix):
     matrix_content = []
     header_content = []
+    #i = 1
 
     for i in range(connection_matrix.GetNumberOfColumns()):
       header_content.append(connection_matrix.GetColumnName(i))
 
-    matrix_content.append(header_content)
+    #matrix_content.append(header_content)
 
     for i in range(connection_matrix.GetNumberOfRows()):
       row_content = []
       for j in range(connection_matrix.GetNumberOfColumns()):
         row_content.append(connection_matrix.GetCellText(i, j))
+        #print('row content', type(row_content[j]))
+        #row_content = [float(v) for v in row_content]
       matrix_content.append(row_content)
 
-    print ('matrix content values', matrix_content)
+    #print ('matrix content values', matrix_content)
     self.matrix_content = matrix_content
-    #return [float(v) for v in matrix_content[0]]
-    #return matrix_content
+    return self.matrix_content
 
   def get_connections_row(self):
-    #self.set_table(connection_matrix)
     l = len(self.matrix_content) 
-    print ('len csv.content', l)
-    # if(index < len(self.matrix_content)): 
-    #   print('content isssss', self.matrix_content[index]) 
-    #   return self.matrix_content[index]
-    #return []
+    #print ('len csv.content', l)
     return self.matrix_content
 
   def get_subject_content(self, index):
     l = len(self.csv_content) 
-    print ('len csv.content', l)
+    #print ('len csv.content', l)
     if(index < len(self.csv_content)): 
-      print('content isssss', self.csv_content[index]) 
+      #print('content isssss', self.csv_content[index]) 
       return self.csv_content[index]
     return []
 
@@ -129,19 +121,17 @@ class json_extract_properties():
 
   def get_subject_values(self, subject_index, min_column, max_column):
     subject_content = self.get_subject_content(subject_index)
-    print("subject_content", subject_content)
-    print("subject_content", len(subject_content))
+    #print("subject_content", subject_content)
+    #print("subject_content", len(subject_content))
     if(len(subject_content) > min_column):
       #return subject_content[min_column:max_column]
       return [float(v) for v in subject_content[min_column:max_column]]
     return []
 
   def get_connection_rows(self, row_index):
-    #row_content = self.get_connections_row(0)
     row_content = self.matrix_content[row_index]
-    print("row_content", row_content)
-    print("row_content", len(row_content))
+    #print("row_content", row_content)
+    #print("row_content", len(row_content))
     if(len(row_content) > 0):
-      #return subject_content[min_column:max_column]
       return [float(v) for v in row_content]
     return []
