@@ -23,17 +23,17 @@ The user can influence properties such as:
 ### Node plotting after Json File and Node Table input
 <!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/nodes.png) -->
 
-![nodes](./docs/nodes.png?raw=true)
+![nodes](./doc/nodes.png)
 
 ### Connections and Nodes after connection matrix input
 <!-- ![brain_connectome](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/brain_connectome.png) -->
 
-![brain_connectome](./docs/brain_connectome.png?raw=true)
+![brain_connectome](./doc/brain_connectome.png)
 
 ### Default and log connection distribution
 <!-- ![connection_distributions](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/connection_distributions.gif?raw=true) -->
 
-![connection_distributions](./docs/connection_distributions.png?raw=true)
+![connection_distributions](./doc/connection_distributions.png?raw=true)
 
 ### Connectome with brain sample data
 <!-- ![connectome_sample_data](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/connectome_sample_data.gif?raw=true) -->
