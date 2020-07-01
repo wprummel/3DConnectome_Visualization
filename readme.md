@@ -4,21 +4,21 @@ Contributors: Dr. Juan Prieto (NIRAl, UNC), Dr. Martin Styner, Wieke Prummel (CP
 
 ## What is it?
 BCV (Brain Connectome Visualisation) is programmed in Python and with VTK, CTK and Qt libraries. 
-As the name says it is a 3D cisualisation tool of the brain connectome. 
+As the name says it is a 3D visualisation tool of the brain connectome. 
 What we call a connectome is the mapping of all neural connections within the brain. 
 
 ## How it works?
 Each connection is defined by its strength: visually it represents the thickness of the connection between two brain regions (nodes) and this value is found in the matrix given by the user.
 The module takes three user inputs:
-•	node graph as a Json file
-•	node Table (AAL or Destrieux Matrix) that defines the size of each node in the brain regions 
-•	normalized connection matrix that defines the thickness of the neural connections
+*	node graph as a Json file
+*	node Table (AAL or Destrieux Matrix) that defines the size of each node in the brain regions 
+*	normalized connection matrix that defines the thickness of the neural connections
 
 The user can influence properties such as:
-•	filter the brain regions to visualize (through search bar)
-•	change color and size of nodes
-•	change color and size of connections
-•	change the connection distribution from default scale to log scale
+*	filter the brain regions to visualize (through search bar)
+*	change color and size of nodes
+*	change color and size of connections
+*	change the connection distribution from default scale to log scale
 
 ### Node plotting after Json File and Node Table input
 <!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/nodes.png) -->
