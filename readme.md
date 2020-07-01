@@ -21,12 +21,12 @@ The user can influence properties such as:
 •	change the connection distribution from default scale to log scale
 
 ### Node plotting after Json File and Node Table input
-<!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/node.png?raw=true) -->
+<!-- ![nodes](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/nodes.png) -->
 
 ![nodes](./docs/nodes.png?raw=true)
 
 ### Connections and Nodes after connection matrix input
-<!-- ![brain_connectome](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/brain_connectome.gif?raw=true) -->
+<!-- ![brain_connectome](https://github.com/wprummel/3DConnectome_Visualization/blob/master/doc/brain_connectome.png) -->
 
 ![brain_connectome](./docs/brain_connectome.png?raw=true)
 
